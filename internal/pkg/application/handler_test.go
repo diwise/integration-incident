@@ -16,7 +16,7 @@ func TestGetDeviceStatus(t *testing.T) {
 
 	nr := httptest.NewRecorder()
 
-	GetDeviceStatus(log, server.URL, "", "")
+	GetDeviceStatus(log, server.URL, server.URL, "")
 	if nr.Code != http.StatusOK {
 		t.Errorf("Request failed, status code not OK: %d", nr.Code)
 	}
@@ -26,14 +26,16 @@ func TestGetDeviceStatus(t *testing.T) {
 func TestPostIncident(t *testing.T) {
 	log := logging.NewLogger()
 
+	server := setupMockService(http.StatusOK, "")
+
 	incident := models.Incident{
-		DeviceId:    "deviceID",
-		Description: "description",
-		Category:    5,
-		Coordinates: [2]float64{17.0, 62.0},
+		PersonId:       "deviceID",
+		Description:    "description",
+		Category:       5,
+		MapCoordinates: "62.0,17.0",
 	}
 
-	PostIncident(log, incident, "", "")
+	PostIncident(log, incident, server.URL, "")
 }
 
 func setupMockService(responseCode int, responseBody string) *httptest.Server {

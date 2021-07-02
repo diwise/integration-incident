@@ -20,6 +20,7 @@ func GetDeviceStatus(log logging.Logger, baseUrl, gatewayUrl, apiKey string) err
 		return err
 	}
 
+	const lifebuoyCategory int = 15
 	deviceStatus := models.DeviceStatus{}
 	incident := models.Incident{}
 
@@ -31,16 +32,17 @@ func GetDeviceStatus(log logging.Logger, baseUrl, gatewayUrl, apiKey string) err
 
 				if deviceStatus.DeviceId == device.ID && deviceStatus.Status == "on" {
 
-					incident.DeviceId = device.ID
+					incident.PersonId = device.ID
 
 					if device.Location != nil {
-						incident.Coordinates = device.Location.GetAsPoint().Coordinates
+						lon := device.Location.GetAsPoint().Coordinates[0]
+						lat := device.Location.GetAsPoint().Coordinates[1]
+
+						incident.MapCoordinates = fmt.Sprintf("%f,%f", lat, lon)
 					}
 
-					incident.Category = 5
-					incident.Description = "Lifebuoy may have been moved or tampered with."
-
-					fmt.Print(incident)
+					incident.Category = lifebuoyCategory
+					incident.Description = "Livboj kan ha flyttats eller utsatts för åverkan."
 
 					PostIncident(log, incident, gatewayUrl, apiKey)
 				}
@@ -61,13 +63,15 @@ func PostIncident(log logging.Logger, incident models.Incident, gatewayUrl, apiK
 		log.Errorf("could not marshal incident message into json")
 	}
 
-	fmt.Print(incidentBytes)
+	fmt.Println(string(incidentBytes))
+	log.Infof("posting incident to: %s", gatewayUrl)
 
 	resp, err := http.Post(gatewayUrl, "application/ld+json", bytes.NewBuffer(incidentBytes))
-	if resp.StatusCode != http.StatusOK || err != nil {
+	if err != nil || resp.StatusCode != http.StatusOK {
 		log.Errorf("failed to post incident message: %s", err)
 		return err
 	}
+
 	return nil
 }
 
