@@ -15,15 +15,12 @@ func TestGetDeviceStatus(t *testing.T) {
 
 	server := setupMockService(http.StatusOK, livbojJson)
 
-	nr := httptest.NewRecorder()
-
 	incidentReporter, _ := incident.NewIncidentReporter(log, server.URL, "")
 
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, incidentReporter)
-	if nr.Code != http.StatusOK {
-		t.Errorf("Request failed, status code not OK: %d", nr.Code)
+	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, incidentReporter)
+	if err != nil {
+		t.Errorf("Request failed: %s", err.Error())
 	}
-
 }
 
 func setupMockService(responseCode int, responseBody string) *httptest.Server {
