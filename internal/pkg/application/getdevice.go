@@ -1,7 +1,6 @@
 package application
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,17 +11,17 @@ import (
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
 )
 
-func GetDeviceStatus(log logging.Logger, baseUrl, gatewayUrl, apiKey string) error {
+func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 
 	devices, err := getDevicesFromContextBroker(baseUrl)
 	if err != nil {
-		log.Errorf("failed to get devices from context: %s", err)
+		log.Errorf("failed to get devices from context: %s", err.Error())
 		return err
 	}
 
 	const lifebuoyCategory int = 15
 	deviceStatus := models.DeviceStatus{}
-	incident := models.Incident{}
+	inc := models.Incident{}
 
 	for _, device := range devices {
 
@@ -32,44 +31,28 @@ func GetDeviceStatus(log logging.Logger, baseUrl, gatewayUrl, apiKey string) err
 
 				if deviceStatus.DeviceId == device.ID && deviceStatus.Status == "on" {
 
-					incident.PersonId = device.ID
+					inc.PersonId = device.ID
 
 					if device.Location != nil {
 						lon := device.Location.GetAsPoint().Coordinates[0]
 						lat := device.Location.GetAsPoint().Coordinates[1]
 
-						incident.MapCoordinates = fmt.Sprintf("%f,%f", lat, lon)
+						inc.MapCoordinates = fmt.Sprintf("%f,%f", lat, lon)
 					}
 
-					incident.Category = lifebuoyCategory
-					incident.Description = "Livboj kan ha flyttats eller utsatts för åverkan."
+					inc.Category = lifebuoyCategory
+					inc.Description = "Livboj kan ha flyttats eller utsatts för åverkan."
 
-					PostIncident(log, incident, gatewayUrl, apiKey)
+					err = incidentReporter(inc)
+					if err != nil {
+						log.Errorf("could not post incident: %s", err.Error())
+					}
 				}
 			}
 
 			deviceStatus.DeviceId = device.ID
 			deviceStatus.Status = device.Value.Value
 		}
-	}
-
-	return nil
-}
-
-func PostIncident(log logging.Logger, incident models.Incident, gatewayUrl, apiKey string) error {
-
-	incidentBytes, err := json.Marshal(incident)
-	if err != nil {
-		log.Errorf("could not marshal incident message into json")
-	}
-
-	fmt.Println(string(incidentBytes))
-	log.Infof("posting incident to: %s", gatewayUrl)
-
-	resp, err := http.Post(gatewayUrl, "application/ld+json", bytes.NewBuffer(incidentBytes))
-	if err != nil || resp.StatusCode != http.StatusOK {
-		log.Errorf("failed to post incident message: %s", err)
-		return err
 	}
 
 	return nil
