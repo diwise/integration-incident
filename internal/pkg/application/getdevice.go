@@ -13,7 +13,7 @@ import (
 
 func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 
-	devices, err := getDevicesFromContextBroker(baseUrl)
+	devices, err := getDevicesFromContextBroker(log, baseUrl)
 	if err != nil {
 		log.Errorf("failed to get devices from context: %s", err.Error())
 		return err
@@ -58,10 +58,13 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 	return nil
 }
 
-func getDevicesFromContextBroker(host string) ([]*fiware.Device, error) {
+func getDevicesFromContextBroker(log logging.Logger, host string) ([]*fiware.Device, error) {
 	response, err := http.Get(fmt.Sprintf("%s/ngsi-ld/v1/entities?type=Device", host))
-	if response.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed: %d", response.StatusCode)
 	}
 
 	defer response.Body.Close()

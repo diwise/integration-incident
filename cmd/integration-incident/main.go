@@ -20,6 +20,9 @@ func main() {
 		log.Fatalf("failed to create incident reporter: %s", err.Error())
 	}
 
-	application.Run(log, baseUrl, incidentReporter)
+	err = application.Run(log, baseUrl, incidentReporter)
+	if err != nil {
+		log.Fatalf("failed to run application, %s", err.Error())
+	}
 
 }

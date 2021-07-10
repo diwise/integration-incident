@@ -40,8 +40,12 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 	req.Header.Add("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil {
 		log.Errorf("failed to post incident message: %s", err.Error())
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("invalid response: %s", resp.StatusCode)
 		return err
 	}
 

@@ -29,6 +29,9 @@ func getAccessToken(log logging.Logger, gatewayUrl, authCode string) (*tokenResp
 		log.Errorf("failed to create get request: %s", err.Error())
 		return nil, err
 	}
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("invalid response: %s", resp.StatusCode)
+	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
