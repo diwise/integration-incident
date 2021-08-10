@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/diwise/integration-incident/infrastructure/logging"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 )
 
 func getAccessToken(log logging.Logger, gatewayUrl, authCode string) (*tokenResponse, error) {

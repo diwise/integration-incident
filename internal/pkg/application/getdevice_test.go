@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diwise/integration-incident/infrastructure/logging"
-	"github.com/diwise/integration-incident/infrastructure/repositories/models"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 )
 
 func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
