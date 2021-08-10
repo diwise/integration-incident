@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/diwise/integration-incident/incident"
-	"github.com/diwise/integration-incident/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/application"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
+	"github.com/diwise/integration-incident/pkg/incident"
 )
 
 func main() {
