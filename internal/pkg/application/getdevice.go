@@ -23,7 +23,7 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 	const lifebuoyCategory int = 15
 	inc := models.Incident{}
-	deviceStatusCache := make(map[string]string)
+	deviceStatusCache = make(map[string]string)
 
 	for _, device := range devices {
 
