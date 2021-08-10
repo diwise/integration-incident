@@ -11,7 +11,7 @@ import (
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
 )
 
-var deviceStatusCache map[string]string
+var deviceStatusCache map[string]string = make(map[string]string)
 
 func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 
@@ -23,7 +23,6 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 	const lifebuoyCategory int = 15
 	inc := models.Incident{}
-	deviceStatusCache = make(map[string]string)
 
 	for _, device := range devices {
 
@@ -37,7 +36,9 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 			} else {
 
-				if device.Value.Value == "off" && device.Value.Value != deviceStatusCache[device.ID] {
+				storedValue := deviceStatusCache[device.ID]
+
+				if device.Value.Value == "off" && device.Value.Value != storedValue {
 
 					inc.PersonId = device.ID
 
