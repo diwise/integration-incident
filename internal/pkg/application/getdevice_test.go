@@ -1,71 +1,166 @@
 package application
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/diwise/integration-incident/incident"
 	"github.com/diwise/integration-incident/infrastructure/logging"
+	"github.com/diwise/integration-incident/infrastructure/repositories/models"
 )
 
-func TestGetDeviceStatus(t *testing.T) {
-	log := logging.NewLogger()
+func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
+	server := setupMockService([]response{
+		{http.StatusOK, livbojJsonOneMissing},
+	})
+	reporter := newIncidentReporterThatReturns(nil)
 
-	server := setupMockService(http.StatusOK, livbojJson)
+	err := GetDeviceStatusAndSendReportIfMissing(logging.NewLogger(), server.URL, reporter.f)
 
-	incidentReporter, _ := incident.NewIncidentReporter(log, server.URL, "")
-
-	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, incidentReporter)
 	if err != nil {
-		t.Errorf("Request failed: %s", err.Error())
+		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
+	} else {
+		reporter.assertNotCalled(t)
 	}
 }
 
-func setupMockService(responseCode int, responseBody string) *httptest.Server {
+func TestThatAReportIsSentWhenOneIsMissing(t *testing.T) {
+	server := setupMockService([]response{
+		{http.StatusOK, livbojJsonAllPresent},
+		{http.StatusOK, livbojJsonOneMissing},
+	})
+	reporter := newIncidentReporterThatReturns(nil)
+	log := logging.NewLogger()
+
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+
+	if err != nil {
+		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
+	} else {
+		reporter.assertCalledOnce(t)
+	}
+}
+
+func TestThatOffStateIsRememberedAndOnlyOneReportIsSent(t *testing.T) {
+	server := setupMockService([]response{
+		{http.StatusOK, livbojJsonAllPresent},
+		{http.StatusOK, livbojJsonOneMissing},
+		{http.StatusOK, livbojJsonOneMissing},
+	})
+	reporter := newIncidentReporterThatReturns(nil)
+	log := logging.NewLogger()
+
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+
+	if err != nil {
+		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
+	} else {
+		reporter.assertCalledOnce(t)
+	}
+}
+
+func TestThatANewReportIsSentAfterStateReset(t *testing.T) {
+	server := setupMockService([]response{
+		{http.StatusOK, livbojJsonAllPresent},
+		{http.StatusOK, livbojJsonOneMissing},
+		{http.StatusOK, livbojJsonAllPresent},
+		{http.StatusOK, livbojJsonOneMissing},
+	})
+	reporter := newIncidentReporterThatReturns(nil)
+	log := logging.NewLogger()
+
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+
+	if err != nil {
+		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
+	} else {
+		reporter.assertCallCount(t, 2)
+	}
+}
+
+type response struct {
+	code int
+	body string
+}
+
+func setupMockService(resp []response) *httptest.Server {
+	responseIndex := 0
+
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "token") {
-			w.Header().Add("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(accessTokenResp))
-		} else {
-			w.Header().Add("Content-Type", "application/ld+json")
-			w.WriteHeader(responseCode)
-			w.Write([]byte(responseBody))
-		}
+		// Respond with the current response ...
+		w.Header().Add("Content-Type", "application/ld+json")
+		w.WriteHeader(resp[responseIndex].code)
+		w.Write([]byte(resp[responseIndex].body))
+
+		// ... and move forward to the next response (start over if the call count exceeds the response count)
+		responseIndex = (responseIndex + 1) % len(resp)
 	}))
 }
 
-const livbojJson string = `[
-	{
-		"@context": [
-			"https://schema.lab.fiware.org/ld/context",
-			"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
-		],
-		"id": "urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-01",
-		"type": "Device",
-		"value": {
-			"type": "Property",
-			"value": "on"
-		}
-	},
-	{
-		"@context": [
-			"https://schema.lab.fiware.org/ld/context",
-			"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
-		],
-		"id": "urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-01",
-		"type": "Device",
-		"value": {
-			"type": "Property",
-			"value": "off"
+func newIncidentReporterThatReturns(err error) *incidentReporter {
+	return &incidentReporter{returnValue: err}
+}
+
+type incidentReporter struct {
+	callCount   int32
+	returnValue error
+}
+
+func (r *incidentReporter) assertCallCount(t *testing.T, expected int32) {
+	if r.callCount != expected {
+		if expected == 0 {
+			t.Errorf("Incident reporter should not have been called, but was called %d times!", r.callCount)
+		} else if expected == 1 {
+			t.Errorf("Incident reporter should have been called once, but was called %d times!", r.callCount)
+		} else {
+			t.Errorf("Incident reporter should have been called %d times, but was called %d times!", expected, r.callCount)
 		}
 	}
-]`
+}
 
-const accessTokenResp string = `{"access_token":"ncjklhclabclksabclac",
-"scope":"am_application_scope default",
-"token_type":"Bearer",
-"expires_in":3600}
-`
+func (r *incidentReporter) assertCalledOnce(t *testing.T) {
+	r.assertCallCount(t, 1)
+}
+
+func (r *incidentReporter) assertNotCalled(t *testing.T) {
+	r.assertCallCount(t, 0)
+}
+
+func (r *incidentReporter) f(models.Incident) error {
+	r.callCount++
+	return r.returnValue
+}
+
+var livbojJsonAllPresent string = createStatusBody("boj1", "on", "boj2", "on")
+var livbojJsonOneMissing string = createStatusBody("boj1", "on", "boj2", "off")
+
+func createStatusBody(args ...string) string {
+	var deviceStatuses []string
+
+	for i := 0; i < len(args); i += 2 {
+		deviceStatuses = append(deviceStatuses, fmt.Sprintf(livbojJsonFormat, args[i], args[i+1]))
+	}
+
+	return fmt.Sprintf("[%s]", strings.Join(deviceStatuses, ","))
+}
+
+const livbojJsonFormat string = `{
+	"@context": [
+		"https://schema.lab.fiware.org/ld/context",
+		"https://uri.etsi.org/ngsi-ld/v1/ngsi-ld-core-context.jsonld"
+	],
+	"id": "urn:ngsi-ld:Device:io:diwise:sn-elt-livboj-%s",
+	"type": "Device",
+	"value": {
+		"type": "Property",
+		"value": "%s"
+	}
+}`
