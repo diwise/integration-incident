@@ -9,14 +9,13 @@ import (
 )
 
 func Run(log logging.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
-	log.Infof("Polling for device status ...")
-
 	err := GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
 	if err != nil {
-		return fmt.Errorf("failed to start polling for devices, %s", err.Error())
+		return fmt.Errorf("failed to start polling for devices: %s", err.Error())
 	}
 
 	for {
+		log.Infof("Polling for device status ...")
 		GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
 		time.Sleep(5 * time.Second)
 	}
