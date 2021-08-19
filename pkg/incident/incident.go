@@ -3,6 +3,7 @@ package incident
 import (
 	"bytes"
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
@@ -32,6 +33,8 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 		log.Errorf("could not marshal incident message into json: %s", err.Error())
 	}
 
+	gatewayUrl = gatewayUrl + "/incident/v01/api/sendincident"
+
 	log.Infof("posting incident to: %s", gatewayUrl)
 
 	client := http.Client{}
@@ -45,9 +48,26 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Errorf("invalid response: %s", resp.StatusCode)
+		log.Errorf("failed to create incident: %s", resp.StatusCode)
 		return err
 	}
 
+	responseBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Error("failed to read response body: %s", err.Error())
+	}
+
+	response := incidentResponse{}
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		log.Error("failed to unmarshal incident response: %s", err.Error())
+	}
+
+	log.Infof("status ok, incident created with ID: %s", response.IncidentID)
+
 	return nil
+}
+
+type incidentResponse struct {
+	IncidentID string `json:"incidentId"`
 }

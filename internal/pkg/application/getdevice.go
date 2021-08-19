@@ -40,7 +40,7 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 				if device.Value.Value == "off" && device.Value.Value != storedValue {
 
-					inc.PersonId = device.ID
+					inc.PersonId = "diwise"
 
 					if device.Location != nil {
 						lon := device.Location.GetAsPoint().Coordinates[0]
