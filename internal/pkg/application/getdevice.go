@@ -43,8 +43,8 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 					inc.PersonId = "diwise"
 
 					if device.Location != nil {
-						lon := device.Location.GetAsPoint().Coordinates[0]
-						lat := device.Location.GetAsPoint().Coordinates[1]
+						lon := device.Location.GetAsPoint().Longitude()
+						lat := device.Location.GetAsPoint().Latitude()
 
 						inc.MapCoordinates = fmt.Sprintf("%f,%f", lat, lon)
 					}

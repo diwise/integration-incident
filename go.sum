@@ -1,8 +1,8 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/diwise/ngsi-ld-golang v0.0.0-20210619150605-2c79d62512e8 h1:sPMqKWVD08o8Q2gJ2mPMkd8qVUISvkHSLaQKYcoFjc4=
-github.com/diwise/ngsi-ld-golang v0.0.0-20210619150605-2c79d62512e8/go.mod h1:3FPU/KnkLJTOttYoYnyxeeNa2Pco8nhPXrhspF7qtXM=
+github.com/diwise/ngsi-ld-golang v0.0.0-20210830140856-f7008ded921f h1:s/m4I8xtBDnD6Wa+wILPEz+KdPXSkbHd8rquUTmPDq0=
+github.com/diwise/ngsi-ld-golang v0.0.0-20210830140856-f7008ded921f/go.mod h1:3FPU/KnkLJTOttYoYnyxeeNa2Pco8nhPXrhspF7qtXM=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
