@@ -3,12 +3,16 @@ package incident
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 )
+
+var errNotAuthorized = errors.New("invalid auth code or token refresh required")
 
 func NewIncidentReporter(log logging.Logger, gatewayUrl, authCode string) (func(models.Incident) error, error) {
 	token, err := getAccessToken(log, gatewayUrl, authCode)
@@ -17,7 +21,7 @@ func NewIncidentReporter(log logging.Logger, gatewayUrl, authCode string) (func(
 	}
 	return func(incident models.Incident) error {
 		err := postIncident(log, incident, gatewayUrl, token.AccessToken)
-		if err != nil {
+		if err == errNotAuthorized {
 			log.Infof("post incident failed, retrying with refreshed access token: %s", err.Error())
 			token, _ = getAccessToken(log, gatewayUrl, authCode)
 			return postIncident(log, incident, gatewayUrl, token.AccessToken)
@@ -30,7 +34,7 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 
 	incidentBytes, err := json.Marshal(incident)
 	if err != nil {
-		log.Errorf("could not marshal incident message into json: %s", err.Error())
+		return fmt.Errorf("could not marshal incident message into json: %s", err.Error())
 	}
 
 	gatewayUrl = gatewayUrl + "/incident/v01/api/sendincident"
@@ -41,33 +45,43 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 
 	req, _ := http.NewRequest("POST", gatewayUrl, bytes.NewBuffer(incidentBytes))
 	req.Header.Add("Authorization", "Bearer "+token)
+	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Errorf("failed to post incident message: %s", err.Error())
-		return err
+		return fmt.Errorf("failed to post incident message: %s", err.Error())
 	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return errNotAuthorized
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		log.Errorf("failed to create incident: %s", resp.StatusCode)
-		return err
+		return fmt.Errorf("bad response code from backend: %d", resp.StatusCode)
 	}
 
 	responseBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Error("failed to read response body: %s", err.Error())
+		return fmt.Errorf("failed to read response body: %s", err.Error())
 	}
 
 	response := incidentResponse{}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		log.Error("failed to unmarshal incident response: %s", err.Error())
+		return fmt.Errorf("failed to unmarshal incident response: %s", err.Error())
 	}
 
-	log.Infof("status ok, incident created with ID: %s", response.IncidentID)
+	if response.Status != "OK" {
+		return fmt.Errorf("incident backend returned status \"%s\" with message \"%s\"", response.Status, response.Message)
+	}
+
+	log.Infof("incident created with ID: %s", response.IncidentID)
 
 	return nil
 }
 
 type incidentResponse struct {
+	Status     string `json:"status"`
 	IncidentID string `json:"incidentId"`
+	Message    string `json:"message"`
 }
