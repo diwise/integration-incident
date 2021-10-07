@@ -37,7 +37,7 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 		return fmt.Errorf("could not marshal incident message into json: %s", err.Error())
 	}
 
-	gatewayUrl = gatewayUrl + "/incident/v01/api/sendincident"
+	gatewayUrl = gatewayUrl + "/incident/1.0/api/sendincident"
 
 	log.Infof("posting incident to: %s", gatewayUrl)
 
