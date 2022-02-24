@@ -30,7 +30,7 @@ func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResp
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Err(nil).Msgf("invalid response: %d", resp.StatusCode)
+		log.Info().Msgf("invalid response: %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)

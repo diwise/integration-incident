@@ -26,7 +26,7 @@ func main() {
 
 	err = application.Run(log, baseUrl, incidentReporter)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create incident reporter")
+		log.Fatal().Err(err).Msg("failed to run application")
 	}
 
 }

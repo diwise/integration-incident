@@ -38,8 +38,7 @@ func GetDeviceStatusAndSendReportIfMissing(log zerolog.Logger, baseUrl string, i
 				storedValue := deviceStatusCache[device.ID]
 
 				if device.Value.Value == "off" && device.Value.Value != storedValue {
-					sublogger := log.With().Str("deviceID", device.ID).Logger()
-					sublogger.Info().Msgf("state changed to \"off\"")
+					log.Info().Msgf("state changed to \"off\" on device: %s", device.ID)
 
 					inc.PersonId = "diwise"
 
