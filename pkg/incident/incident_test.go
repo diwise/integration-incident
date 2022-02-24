@@ -6,12 +6,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/rs/zerolog"
 )
 
 func TestPostIncident(t *testing.T) {
-	log := logging.NewLogger()
+	log := zerolog.Logger{}
 
 	server := setupMockService(http.StatusOK, accessTokenResp)
 

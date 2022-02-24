@@ -7,17 +7,17 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
+	"github.com/rs/zerolog"
 )
 
-func getAccessToken(log logging.Logger, gatewayUrl, authCode string) (*tokenResponse, error) {
+func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResponse, error) {
 	params := url.Values{}
 	params.Add("grant_type", `client_credentials`)
 	body := strings.NewReader(params.Encode())
 
 	req, err := http.NewRequest("POST", gatewayUrl+"/token", body)
 	if err != nil {
-		log.Errorf("failed to create post request: %s", err.Error())
+		log.Err(err).Msgf("failed to create post request: %s", err.Error())
 		return nil, err
 	}
 
@@ -26,16 +26,16 @@ func getAccessToken(log logging.Logger, gatewayUrl, authCode string) (*tokenResp
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Errorf("failed to create get request: %s", err.Error())
+		log.Err(err).Msgf("failed to create get request: %s", err.Error())
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Errorf("invalid response: %s", resp.StatusCode)
+		log.Err(err).Msgf("invalid response: %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Errorf("failed to read response body: %s", err.Error())
+		log.Err(err).Msgf("failed to read response body: %s", err.Error())
 		return nil, err
 	}
 
@@ -45,7 +45,7 @@ func getAccessToken(log logging.Logger, gatewayUrl, authCode string) (*tokenResp
 
 	err = json.Unmarshal(bodyBytes, &token)
 	if err != nil {
-		log.Errorf("failed to unmarshal access token json: %s", err.Error())
+		log.Err(err).Msgf("failed to unmarshal access token json: %s", err.Error())
 		return nil, err
 	}
 

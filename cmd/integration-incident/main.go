@@ -4,12 +4,12 @@ import (
 	"os"
 
 	"github.com/diwise/integration-incident/internal/pkg/application"
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/pkg/incident"
+	"github.com/rs/zerolog"
 )
 
 func main() {
-	log := logging.NewLogger()
+	log := zerolog.Logger{}
 
 	baseUrl := os.Getenv("DIWISE_BASE_URL")
 	gatewayUrl := os.Getenv("GATEWAY_URL")
@@ -17,12 +17,12 @@ func main() {
 
 	incidentReporter, err := incident.NewIncidentReporter(log, gatewayUrl, authCode)
 	if err != nil {
-		log.Fatalf("failed to create incident reporter: %s", err.Error())
+		log.Fatal().Msgf("failed to create incident reporter: %s", err.Error())
 	}
 
 	err = application.Run(log, baseUrl, incidentReporter)
 	if err != nil {
-		log.Fatalf("failed to run application, %s", err.Error())
+		log.Fatal().Msgf("failed to create incident reporter: %s", err.Error())
 	}
 
 }

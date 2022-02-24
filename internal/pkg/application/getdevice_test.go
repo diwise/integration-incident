@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/rs/zerolog"
 )
 
 func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
@@ -17,7 +17,7 @@ func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
 	})
 	reporter := newIncidentReporterThatReturns(nil)
 
-	err := GetDeviceStatusAndSendReportIfMissing(logging.NewLogger(), server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(zerolog.Logger{}, server.URL, reporter.f)
 
 	if err != nil {
 		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
@@ -32,7 +32,7 @@ func TestThatAReportIsSentWhenOneIsMissing(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := logging.NewLogger()
+	log := zerolog.Logger{}
 
 	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
 	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
@@ -51,7 +51,7 @@ func TestThatOffStateIsRememberedAndOnlyOneReportIsSent(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := logging.NewLogger()
+	log := zerolog.Logger{}
 
 	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
 	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
@@ -72,7 +72,7 @@ func TestThatANewReportIsSentAfterStateReset(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := logging.NewLogger()
+	log := zerolog.Logger{}
 
 	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
 	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)

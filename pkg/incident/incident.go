@@ -8,13 +8,13 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/rs/zerolog"
 )
 
 var errNotAuthorized = errors.New("invalid auth code or token refresh required")
 
-func NewIncidentReporter(log logging.Logger, gatewayUrl, authCode string) (func(models.Incident) error, error) {
+func NewIncidentReporter(log zerolog.Logger, gatewayUrl, authCode string) (func(models.Incident) error, error) {
 	token, err := getAccessToken(log, gatewayUrl, authCode)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func NewIncidentReporter(log logging.Logger, gatewayUrl, authCode string) (func(
 	return func(incident models.Incident) error {
 		err := postIncident(log, incident, gatewayUrl, token.AccessToken)
 		if err == errNotAuthorized {
-			log.Infof("post incident failed, retrying with refreshed access token: %s", err.Error())
+			log.Info().Msgf("post incident failed, retrying with refreshed access token: %s", err.Error())
 			token, _ = getAccessToken(log, gatewayUrl, authCode)
 			return postIncident(log, incident, gatewayUrl, token.AccessToken)
 		}
@@ -30,7 +30,7 @@ func NewIncidentReporter(log logging.Logger, gatewayUrl, authCode string) (func(
 	}, nil
 }
 
-func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, token string) error {
+func postIncident(log zerolog.Logger, incident models.Incident, gatewayUrl, token string) error {
 
 	incidentBytes, err := json.Marshal(incident)
 	if err != nil {
@@ -39,7 +39,7 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 
 	gatewayUrl = gatewayUrl + "/incident/1.0/api/sendincident"
 
-	log.Infof("posting incident to: %s", gatewayUrl)
+	log.Info().Msgf("posting incident to: %s", gatewayUrl)
 
 	client := http.Client{}
 
@@ -75,7 +75,7 @@ func postIncident(log logging.Logger, incident models.Incident, gatewayUrl, toke
 		return fmt.Errorf("incident backend returned status \"%s\" with message \"%s\"", response.Status, response.Message)
 	}
 
-	log.Infof("incident created with ID: %s", response.IncidentID)
+	log.Info().Msgf("incident created with ID: %s", response.IncidentID)
 
 	return nil
 }

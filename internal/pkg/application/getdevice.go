@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/logging"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
+	"github.com/rs/zerolog"
 )
 
 var deviceStatusCache map[string]string = make(map[string]string)
 
-func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
+func GetDeviceStatusAndSendReportIfMissing(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 
 	devices, err := getDevicesFromContextBroker(log, baseUrl)
 	if err != nil {
-		log.Errorf("failed to get devices from context: %s", err.Error())
+		log.Err(err).Msgf("failed to get devices from context: %s", err.Error())
 		return err
 	}
 
@@ -39,7 +39,7 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 				if device.Value.Value == "off" && device.Value.Value != storedValue {
 
-					log.Infof("state changed to \"off\" for device %s", device.ID)
+					log.Info().Msgf("state changed to \"off\" for device %s", device.ID)
 
 					inc.PersonId = "diwise"
 
@@ -55,7 +55,7 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 
 					err = incidentReporter(inc)
 					if err != nil {
-						log.Errorf("could not post incident: %s", err.Error())
+						log.Err(err).Msgf("could not post incident: %s", err.Error())
 						return err
 					}
 				}
@@ -67,7 +67,7 @@ func GetDeviceStatusAndSendReportIfMissing(log logging.Logger, baseUrl string, i
 	return nil
 }
 
-func getDevicesFromContextBroker(log logging.Logger, host string) ([]*fiware.Device, error) {
+func getDevicesFromContextBroker(log zerolog.Logger, host string) ([]*fiware.Device, error) {
 	response, err := http.Get(fmt.Sprintf("%s/ngsi-ld/v1/entities?type=Device", host))
 	if err != nil {
 		return nil, err
