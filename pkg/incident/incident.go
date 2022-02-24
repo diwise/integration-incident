@@ -22,7 +22,7 @@ func NewIncidentReporter(log zerolog.Logger, gatewayUrl, authCode string) (func(
 	return func(incident models.Incident) error {
 		err := postIncident(log, incident, gatewayUrl, token.AccessToken)
 		if err == errNotAuthorized {
-			log.Info().Msgf("post incident failed, retrying with refreshed access token: %s", err.Error())
+			log.Err(err).Msg("post incident failed, retrying with refreshed access token")
 			token, _ = getAccessToken(log, gatewayUrl, authCode)
 			return postIncident(log, incident, gatewayUrl, token.AccessToken)
 		}

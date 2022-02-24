@@ -17,7 +17,7 @@ func GetDeviceStatusAndSendReportIfMissing(log zerolog.Logger, baseUrl string, i
 
 	devices, err := getDevicesFromContextBroker(log, baseUrl)
 	if err != nil {
-		log.Err(err).Msgf("failed to get devices from context: %s", err.Error())
+		log.Err(err).Msg("failed to get devices from context")
 		return err
 	}
 
@@ -38,8 +38,8 @@ func GetDeviceStatusAndSendReportIfMissing(log zerolog.Logger, baseUrl string, i
 				storedValue := deviceStatusCache[device.ID]
 
 				if device.Value.Value == "off" && device.Value.Value != storedValue {
-
-					log.Info().Msgf("state changed to \"off\" for device %s", device.ID)
+					sublogger := log.With().Str("deviceID", device.ID).Logger()
+					sublogger.Info().Msgf("state changed to \"off\"")
 
 					inc.PersonId = "diwise"
 
@@ -55,7 +55,7 @@ func GetDeviceStatusAndSendReportIfMissing(log zerolog.Logger, baseUrl string, i
 
 					err = incidentReporter(inc)
 					if err != nil {
-						log.Err(err).Msgf("could not post incident: %s", err.Error())
+						log.Err(err).Msg("could not post incident")
 						return err
 					}
 				}

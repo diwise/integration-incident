@@ -17,7 +17,7 @@ func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResp
 
 	req, err := http.NewRequest("POST", gatewayUrl+"/token", body)
 	if err != nil {
-		log.Err(err).Msgf("failed to create post request: %s", err.Error())
+		log.Err(err).Msg("failed to create post request")
 		return nil, err
 	}
 
@@ -26,16 +26,16 @@ func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResp
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Err(err).Msgf("failed to create get request: %s", err.Error())
+		log.Err(err).Msg("failed to create get request")
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
-		log.Err(err).Msgf("invalid response: %d", resp.StatusCode)
+		log.Err(nil).Msgf("invalid response: %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		log.Err(err).Msgf("failed to read response body: %s", err.Error())
+		log.Err(err).Msg("failed to read response body")
 		return nil, err
 	}
 
@@ -45,7 +45,7 @@ func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResp
 
 	err = json.Unmarshal(bodyBytes, &token)
 	if err != nil {
-		log.Err(err).Msgf("failed to unmarshal access token json: %s", err.Error())
+		log.Err(err).Msg("failed to unmarshal access token json")
 		return nil, err
 	}
 
