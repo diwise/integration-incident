@@ -18,15 +18,21 @@ func main() {
 	baseUrl := os.Getenv("DIWISE_BASE_URL")
 	gatewayUrl := os.Getenv("GATEWAY_URL")
 	authCode := os.Getenv("AUTH_CODE")
+	port := os.Getenv("SERVICE_PORT")
+	if port == "" {
+		port = "8080"
+	}
 
 	incidentReporter, err := incident.NewIncidentReporter(log, gatewayUrl, authCode)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create incident reporter")
 	}
 
-	err = application.Run(log, baseUrl, incidentReporter)
+	go application.RunPoll(log, baseUrl, incidentReporter)
+
+	err = application.CreateRouterAndStartServing(serviceName)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to run application")
+		log.Fatal().Err(err).Msg("failed to start serving requests")
 	}
 
 }

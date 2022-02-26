@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func Run(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
+func RunPoll(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 	err := GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
 	if err != nil {
 		return fmt.Errorf("failed to start polling for devices: %s", err.Error())
