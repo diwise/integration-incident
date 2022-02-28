@@ -28,11 +28,11 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to create incident reporter")
 	}
 
-	go application.RunPoll(log, baseUrl, incidentReporter)
+	app := application.NewApplication(log, incidentReporter, baseUrl, port)
 
-	err = application.CreateRouterAndStartServing(log, serviceName)
+	err = app.Start()
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start serving requests")
+		log.Fatal().Err(err).Msg("failed to start application")
 	}
 
 }

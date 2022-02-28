@@ -1,13 +1,14 @@
-package application
+package presentation
 
 import (
 	"compress/flate"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
-	"github.com/diwise/integration-incident/presentation/api"
+	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
@@ -78,6 +79,7 @@ func checkPreviousDeviceState(deviceId, state string) {
 
 	if previousState[deviceId] != state {
 		//create incident
+		fmt.Print("create incident")
 	}
 }
 
