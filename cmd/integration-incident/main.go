@@ -30,7 +30,7 @@ func main() {
 
 	go application.RunPoll(log, baseUrl, incidentReporter)
 
-	err = application.CreateRouterAndStartServing(serviceName)
+	err = application.CreateRouterAndStartServing(log, serviceName)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to start serving requests")
 	}

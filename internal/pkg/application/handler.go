@@ -6,14 +6,15 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/diwise/integration-incident/presentation/api"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/cors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-func CreateRouterAndStartServing(servicePort string) error {
+func CreateRouterAndStartServing(log zerolog.Logger, servicePort string) error {
 	r := chi.NewRouter()
 
 	r.Use(cors.New(cors.Options{
@@ -41,7 +42,7 @@ func CreateRouterAndStartServing(servicePort string) error {
 
 func notificationHandler() http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		notif := models.Notification{}
+		notif := api.Notification{}
 
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {

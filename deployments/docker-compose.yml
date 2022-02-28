@@ -10,7 +10,7 @@ services:
       DIWISE_BASE_URL: $DIWISE_BASE_URL
       GATEWAY_URL: $GATEWAY_URL
       AUTH_CODE: $AUTH_CODE
-      SERVICE_PORT: $SERVICE_PORT
+      SERVICE_PORT: '8282'
     
     ports:
       - '8282'
