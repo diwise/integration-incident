@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/diwise/integration-incident/presentation/api"
 	"github.com/go-chi/chi/v5"
@@ -51,8 +52,33 @@ func notificationHandler() http.HandlerFunc {
 
 		err = json.Unmarshal(bodyBytes, &notif)
 		if err != nil {
-			log.Err(err).Msg("failed to unmarshal request body into fiware device")
+			log.Err(err).Msg("failed to unmarshal request body")
+			w.WriteHeader(http.StatusInternalServerError)
 		}
 
+		//check if we have already looked at device state, and if yes, what was previous state?
+
+		if len(notif.Data) != 0 {
+			for _, device := range notif.Data {
+				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
+					checkPreviousDeviceState(device.ID, device.DeviceState.Value)
+
+				}
+			}
+		}
 	})
 }
+
+func checkPreviousDeviceState(deviceId, state string) {
+	_, exists := previousState[deviceId]
+
+	if !exists {
+		previousState[deviceId] = state
+	}
+
+	if previousState[deviceId] != state {
+		//create incident
+	}
+}
+
+var previousState map[string]string = make(map[string]string)
