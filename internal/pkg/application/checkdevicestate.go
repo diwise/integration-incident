@@ -9,7 +9,7 @@ import (
 
 var previousState map[string]string = make(map[string]string)
 
-func CheckPreviousDeviceState(deviceId, state string) bool {
+func checkPreviousDeviceState(deviceId, state string) bool {
 	_, exists := previousState[deviceId]
 
 	if !exists {
@@ -24,7 +24,7 @@ func CheckPreviousDeviceState(deviceId, state string) bool {
 	return false
 }
 
-func CreateAndSendIncident(deviceId, state string, incidentReporter func(models.Incident) error) error {
+func createAndSendIncident(deviceId, state string, incidentReporter func(models.Incident) error) error {
 	const watermeterCategory int = 16
 	incident := models.Incident{}
 

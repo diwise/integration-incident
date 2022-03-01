@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/diwise/integration-incident/internal/pkg/application"
+	"github.com/diwise/integration-incident/internal/pkg/presentation"
 	"github.com/diwise/integration-incident/pkg/incident"
 	"github.com/rs/zerolog/log"
 )
@@ -33,6 +34,11 @@ func main() {
 	err = app.Start()
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to start application")
+	}
+
+	err = presentation.CreateRouterAndStartServing(log, app, port)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to start router")
 	}
 
 }

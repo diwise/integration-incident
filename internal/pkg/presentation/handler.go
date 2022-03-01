@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	watermeters "github.com/diwise/integration-incident/internal/pkg/application/watermeters"
-	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/diwise/integration-incident/internal/pkg/application"
 	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -17,7 +16,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func CreateRouterAndStartServing(log zerolog.Logger, incidentReporter func(models.Incident) error, servicePort string) error {
+func CreateRouterAndStartServing(log zerolog.Logger, app application.IntegrationIncident, servicePort string) error {
 	r := chi.NewRouter()
 
 	r.Use(cors.New(cors.Options{
@@ -30,7 +29,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, incidentReporter func(model
 	r.Use(compressor.Handler)
 	r.Use(middleware.Logger)
 
-	r.Post("/notification", notificationHandler(incidentReporter))
+	r.Post("/notification", notificationHandler(app))
 
 	log.Info().Str("port", servicePort).Msg("starting to listen for connections")
 
@@ -43,7 +42,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, incidentReporter func(model
 	return nil
 }
 
-func notificationHandler(incidentReporter func(models.Incident) error) http.HandlerFunc {
+func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		notif := api.Notification{}
 
@@ -61,17 +60,9 @@ func notificationHandler(incidentReporter func(models.Incident) error) http.Hand
 		if len(notif.Data) != 0 {
 			for _, device := range notif.Data {
 				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
-					stateChanged := watermeters.CheckPreviousDeviceState(device.ID, device.DeviceState.Value)
-
-					if !stateChanged {
-						log.Info().Msg("device state has not changed...")
-						continue
-					}
-
-					err = watermeters.CreateAndSendIncident(device.ID, device.DeviceState.Value, incidentReporter)
+					err = app.DeviceStateUpdated(device.ID, device.DeviceState.Value)
 					if err != nil {
-						log.Err(err).Msg("failed to create and send incident")
-						w.WriteHeader(http.StatusInternalServerError)
+						w.Write([]byte(err.Error()))
 					}
 				}
 			}
