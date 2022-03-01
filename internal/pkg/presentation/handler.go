@@ -3,11 +3,12 @@ package presentation
 import (
 	"compress/flate"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
+	watermeters "github.com/diwise/integration-incident/internal/pkg/application/watermeters"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,7 +17,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func CreateRouterAndStartServing(log zerolog.Logger, servicePort string) error {
+func CreateRouterAndStartServing(log zerolog.Logger, incidentReporter func(models.Incident) error, servicePort string) error {
 	r := chi.NewRouter()
 
 	r.Use(cors.New(cors.Options{
@@ -29,7 +30,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, servicePort string) error {
 	r.Use(compressor.Handler)
 	r.Use(middleware.Logger)
 
-	r.Post("/notification", notificationHandler())
+	r.Post("/notification", notificationHandler(incidentReporter))
 
 	log.Info().Str("port", servicePort).Msg("starting to listen for connections")
 
@@ -42,7 +43,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, servicePort string) error {
 	return nil
 }
 
-func notificationHandler() http.HandlerFunc {
+func notificationHandler(incidentReporter func(models.Incident) error) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		notif := api.Notification{}
 
@@ -57,30 +58,23 @@ func notificationHandler() http.HandlerFunc {
 			w.WriteHeader(http.StatusInternalServerError)
 		}
 
-		//check if we have already looked at device state, and if yes, what was previous state?
-
 		if len(notif.Data) != 0 {
 			for _, device := range notif.Data {
 				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
-					checkPreviousDeviceState(device.ID, device.DeviceState.Value)
+					stateChanged := watermeters.CheckPreviousDeviceState(device.ID, device.DeviceState.Value)
 
+					if !stateChanged {
+						log.Info().Msg("device state has not changed...")
+						continue
+					}
+
+					err = watermeters.CreateAndSendIncident(device.ID, device.DeviceState.Value, incidentReporter)
+					if err != nil {
+						log.Err(err).Msg("failed to create and send incident")
+						w.WriteHeader(http.StatusInternalServerError)
+					}
 				}
 			}
 		}
 	})
 }
-
-func checkPreviousDeviceState(deviceId, state string) {
-	_, exists := previousState[deviceId]
-
-	if !exists {
-		previousState[deviceId] = state
-	}
-
-	if previousState[deviceId] != state {
-		//create incident
-		fmt.Print("create incident")
-	}
-}
-
-var previousState map[string]string = make(map[string]string)

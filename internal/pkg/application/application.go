@@ -10,6 +10,7 @@ import (
 )
 
 type Application interface {
+	Start() error
 	RunPoll(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error
 }
 
@@ -39,7 +40,7 @@ func (a *newIntegrationIncident) Start() error {
 
 	go a.RunPoll(a.log, a.baseUrl, a.incidentReporter)
 
-	err := presentation.CreateRouterAndStartServing(a.log, a.port)
+	err := presentation.CreateRouterAndStartServing(a.log, a.incidentReporter, a.port)
 	if err != nil {
 		return err
 	}
