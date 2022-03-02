@@ -67,11 +67,11 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 
 	shortId := strings.TrimPrefix(deviceId, prefix)
 
-	if !a.deviceStateHasChanged(shortId, deviceState) {
+	if !a.checkIfDeviceStateHasChanged(shortId, deviceState) {
 		return nil
 	}
 
-	err := a.createAndSendIncident(shortId, deviceState, a.incidentReporter)
+	err := a.createAndSendIncident(shortId, deviceState)
 	if err != nil {
 		return fmt.Errorf("failed to create and send incident: %s", err.Error())
 	}
@@ -85,8 +85,8 @@ func (a *app) updateDeviceState(deviceId, deviceState string) {
 	a.previousStates[deviceId] = deviceState
 }
 
-func (a *app) deviceStateHasChanged(deviceId, state string) bool {
-	_, exists := a.previousStates[deviceId]
+func (a *app) checkIfDeviceStateHasChanged(deviceId, state string) bool {
+	storedState, exists := a.previousStates[deviceId]
 
 	if !exists {
 		log.Info().Msg("device does not exist, saving state...")
@@ -94,7 +94,7 @@ func (a *app) deviceStateHasChanged(deviceId, state string) bool {
 		return false
 	}
 
-	if a.previousStates[deviceId] != state {
+	if storedState != state {
 		log.Info().Msg("device state has changed")
 		return true
 	}
@@ -104,7 +104,7 @@ func (a *app) deviceStateHasChanged(deviceId, state string) bool {
 	return false
 }
 
-func (a *app) createAndSendIncident(deviceId, state string, incidentReporter func(models.Incident) error) error {
+func (a *app) createAndSendIncident(deviceId, state string) error {
 	const watermeterCategory int = 16
 	incident := models.Incident{}
 
@@ -113,7 +113,7 @@ func (a *app) createAndSendIncident(deviceId, state string, incidentReporter fun
 	incident.Description = getDescriptionFromDeviceState(deviceId, state)
 
 	log.Info().Msg("sending incident")
-	err := incidentReporter(incident)
+	err := a.incidentReporter(incident)
 	if err != nil {
 		log.Err(err).Msg("could not post incident")
 		return err
