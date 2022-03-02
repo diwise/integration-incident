@@ -57,7 +57,7 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 	stateChanged := checkIfDeviceExistsAndPreviousDeviceState(deviceId, deviceState)
 
 	if !stateChanged {
-		log.Info().Msg("device state has not changed...")
+		log.Info().Msg("device either does not exist, or state has not changed...")
 		return nil
 	}
 

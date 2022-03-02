@@ -112,6 +112,7 @@ func newIncidentReporterThatReturns(err error) *incidentReporter {
 type incidentReporter struct {
 	callCount   int32
 	returnValue error
+	incidents   []models.Incident
 }
 
 func (r *incidentReporter) assertCallCount(t *testing.T, expected int32) {
@@ -134,8 +135,9 @@ func (r *incidentReporter) assertNotCalled(t *testing.T) {
 	r.assertCallCount(t, 0)
 }
 
-func (r *incidentReporter) f(models.Incident) error {
+func (r *incidentReporter) f(incident models.Incident) error {
 	r.callCount++
+	r.incidents = append(r.incidents, incident)
 	return r.returnValue
 }
 
