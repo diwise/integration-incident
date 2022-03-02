@@ -14,10 +14,9 @@ import (
 func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
 	is := is.New(t)
 
-	server := setupMockService(http.StatusOK, "")
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", server.URL+"/notification", bytes.NewBuffer([]byte(noDeviceState)))
+	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(noDeviceState)))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
@@ -26,52 +25,61 @@ func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
 	is.Equal(len(app.DeviceStateUpdatedCalls()), 0)
 }
 
-func TestNotificationHandlerAddsNewDeviceStateIfNoPreviousStateExists(t *testing.T) {
+func TestNotificationHandlerTriggersDeviceStateUpdatedIfDeviceStateExists(t *testing.T) {
 	is := is.New(t)
 
-	server := setupMockService(http.StatusOK, "")
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", server.URL+"/notification", bytes.NewBuffer([]byte(createStatusBody("123", "104"))))
+	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(createStatusBody("se:servanet:lora:msva:123", "104"))))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 
 	is.Equal(len(app.DeviceStateUpdatedCalls()), 1)
-
-	//this test doesn't actually check that a new device state has been stored yet
 }
 
-func TestNotificationHandlerTriggersDeviceStateUpdatedIfDeviceStateHasChanged(t *testing.T) {
+func TestNotificationHandlerDoesNotTriggersDeviceStateUpdatedIfWrongDeviceID(t *testing.T) {
 	is := is.New(t)
 
-	server := setupMockService(http.StatusOK, "")
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", server.URL+"/notification", bytes.NewBuffer([]byte(createStatusBody("123", "104"))))
+	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(createStatusBody("notawatermeter", "104"))))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 
-	r2 := httptest.NewRequest("POST", server.URL+"/notification", bytes.NewBuffer([]byte(createStatusBody("123", "205"))))
-
-	notificationHandler(app).ServeHTTP(w, r2)
-	is.Equal(w.Code, http.StatusOK)
-	is.Equal(len(app.DeviceStateUpdatedCalls()), 2)
+	is.Equal(len(app.DeviceStateUpdatedCalls()), 0)
 }
 
-func setupMockService(statusCode int, body string) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Content-Type", "application/ld+json")
-		w.WriteHeader(statusCode)
-		w.Write([]byte(body))
-	}))
+func TestNotificationHandlerReturnsBadRequestIfEmptyRequestBody(t *testing.T) {
+	is := is.New(t)
+
+	app := mockApp()
+
+	r := httptest.NewRequest("POST", "/notification", nil)
+	w := httptest.NewRecorder()
+
+	notificationHandler(app).ServeHTTP(w, r)
+	is.Equal(w.Code, http.StatusBadRequest)
 }
 
-const noDeviceState string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:05393925","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41}}]}`
-const withDeviceStateJsonFormat string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:%s","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41},"deviceState":{"type":"Property","value":"%s"}}]}`
+func TestNotificationHandlerReturnsBadRequestIfRequestBodyCannotBeUnmarshalledToNotification(t *testing.T) {
+	is := is.New(t)
+
+	app := mockApp()
+
+	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(badRequestJson)))
+	w := httptest.NewRecorder()
+
+	notificationHandler(app).ServeHTTP(w, r)
+	is.Equal(w.Code, http.StatusBadRequest)
+}
+
+const badRequestJson string = `{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:123","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41}}`
+const noDeviceState string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:123","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41}}]}`
+const withDeviceStateJsonFormat string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:%s","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41},"deviceState":{"type":"Property","value":"%s"}}]}`
 
 func createStatusBody(deviceId, state string) string {
 	return fmt.Sprintf(withDeviceStateJsonFormat, deviceId, state)

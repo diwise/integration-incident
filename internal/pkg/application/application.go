@@ -54,7 +54,7 @@ func (a *app) RunPoll(log zerolog.Logger, baseUrl string, incidentReporter func(
 }
 
 func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
-	stateChanged := checkPreviousDeviceState(deviceId, deviceState)
+	stateChanged := checkIfDeviceExistsAndPreviousDeviceState(deviceId, deviceState)
 
 	if !stateChanged {
 		log.Info().Msg("device state has not changed...")

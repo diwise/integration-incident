@@ -9,7 +9,7 @@ import (
 
 var previousState map[string]string = make(map[string]string)
 
-func checkPreviousDeviceState(deviceId, state string) bool {
+func checkIfDeviceExistsAndPreviousDeviceState(deviceId, state string) bool {
 	_, exists := previousState[deviceId]
 
 	if !exists {

@@ -49,12 +49,21 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 		bodyBytes, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			log.Err(err).Msg("failed to read request body")
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		err = json.Unmarshal(bodyBytes, &notif)
 		if err != nil {
 			log.Err(err).Msg("failed to unmarshal request body")
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		if notif.SubscriptionID == "" {
+			log.Err(err).Msg("request body is not a valid notification")
+			w.WriteHeader(http.StatusBadRequest)
+			return
 		}
 
 		if len(notif.Data) != 0 {
@@ -62,7 +71,7 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
 					err = app.DeviceStateUpdated(device.ID, device.DeviceState.Value)
 					if err != nil {
-						w.Write([]byte(err.Error()))
+						w.WriteHeader(http.StatusInternalServerError)
 					}
 				}
 			}
