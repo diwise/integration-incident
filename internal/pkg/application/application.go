@@ -67,9 +67,7 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 
 	shortId := strings.TrimPrefix(deviceId, prefix)
 
-	stateChanged := a.checkDeviceExistsAndPreviousDeviceState(shortId, deviceState)
-
-	if !stateChanged {
+	if !a.deviceStateHasChanged(shortId, deviceState) {
 		return nil
 	}
 
@@ -87,7 +85,7 @@ func (a *app) updateDeviceState(deviceId, deviceState string) {
 	a.previousStates[deviceId] = deviceState
 }
 
-func (a *app) checkDeviceExistsAndPreviousDeviceState(deviceId, state string) bool {
+func (a *app) deviceStateHasChanged(deviceId, state string) bool {
 	_, exists := a.previousStates[deviceId]
 
 	if !exists {
