@@ -7,7 +7,6 @@ import (
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type IntegrationIncident interface {
@@ -20,14 +19,18 @@ type app struct {
 	incidentReporter func(models.Incident) error
 	baseUrl          string
 	port             string
+	previousStates   map[string]string
 }
 
 func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) error, baseUrl, port string) IntegrationIncident {
+	prevState := make(map[string]string)
+
 	newApp := &app{
 		log:              log,
 		incidentReporter: incidentReporter,
 		baseUrl:          baseUrl,
 		port:             port,
+		previousStates:   prevState,
 	}
 
 	return newApp
@@ -54,17 +57,22 @@ func (a *app) RunPoll(log zerolog.Logger, baseUrl string, incidentReporter func(
 }
 
 func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
-	stateChanged := checkIfDeviceExistsAndPreviousDeviceState(deviceId, deviceState)
+	stateChanged := a.checkDeviceExistsAndPreviousDeviceState(deviceId, deviceState)
 
 	if !stateChanged {
-		log.Info().Msg("device either does not exist, or state has not changed...")
 		return nil
 	}
 
-	err := createAndSendIncident(deviceId, deviceState, a.incidentReporter)
+	err := a.createAndSendIncident(deviceId, deviceState, a.incidentReporter)
 	if err != nil {
 		return fmt.Errorf("failed to create and send incident: %s", err.Error())
 	}
 
+	a.updateDeviceState(deviceId, deviceId)
+
 	return nil
+}
+
+func (a *app) updateDeviceState(deviceId, deviceState string) {
+	a.previousStates[deviceId] = deviceState
 }
