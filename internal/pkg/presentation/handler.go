@@ -29,6 +29,9 @@ func CreateRouterAndStartServing(log zerolog.Logger, app application.Integration
 	r.Use(compressor.Handler)
 	r.Use(middleware.Logger)
 
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 	r.Post("/notification", notificationHandler(app))
 
 	log.Info().Str("port", servicePort).Msg("starting to listen for connections")
