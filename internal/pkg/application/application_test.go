@@ -10,7 +10,7 @@ import (
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("devId1", "devState")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", "0")
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(0))
 }
@@ -18,11 +18,11 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testin
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("devId2", "moto")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "0")
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(0))
 
-	err = app.DeviceStateUpdated("devId2", "moto")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "0")
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(0))
 }
@@ -30,13 +30,26 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *test
 func TestThatDeviceStateUpdatedSendsIncidentReportOnStateChanged(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("devId3", "devState")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", "0")
 	is.NoErr(err)
 
-	err = app.DeviceStateUpdated("devId3", "notthesame")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", "4")
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(1))
-	is.Equal(incRep.incidents[0].Description, "devId3 - notthesame")
+	is.Equal(incRep.incidents[0].Description, "devId3 - Låg Batterinivå")
+	is.Equal(incRep.incidents[0].Category, 16)
+}
+
+func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
+	is, incRep, app := testSetup(t)
+
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", "0")
+	is.NoErr(err)
+
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", "3")
+	is.NoErr(err)
+	is.Equal(incRep.callCount, int32(1))
+	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt Fel: 3")
 	is.Equal(incRep.incidents[0].Category, 16)
 }
 
