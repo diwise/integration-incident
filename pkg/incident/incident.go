@@ -39,7 +39,7 @@ func postIncident(log zerolog.Logger, incident models.Incident, gatewayUrl, toke
 
 	gatewayUrl = gatewayUrl + "/incident/1.0/api/sendincident"
 
-	log.Info().Msgf("posting incident to: %s", gatewayUrl)
+	log.Info().Msgf("posting incident \"%s\" (cat: %d) to: %s", incident.Description, incident.Category, gatewayUrl)
 
 	client := http.Client{}
 
