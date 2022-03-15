@@ -20,6 +20,9 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 // 			DeviceStateUpdatedFunc: func(deviceId string, deviceState string) error {
 // 				panic("mock out the DeviceStateUpdated method")
 // 			},
+// 			DeviceValueUpdatedFunc: func(deviceId string, deviceValue string) error {
+// 				panic("mock out the DeviceValueUpdated method")
+// 			},
 // 			StartFunc: func() error {
 // 				panic("mock out the Start method")
 // 			},
@@ -33,6 +36,9 @@ type IntegrationIncidentMock struct {
 	// DeviceStateUpdatedFunc mocks the DeviceStateUpdated method.
 	DeviceStateUpdatedFunc func(deviceId string, deviceState string) error
 
+	// DeviceValueUpdatedFunc mocks the DeviceValueUpdated method.
+	DeviceValueUpdatedFunc func(deviceId string, deviceValue string) error
+
 	// StartFunc mocks the Start method.
 	StartFunc func() error
 
@@ -45,11 +51,19 @@ type IntegrationIncidentMock struct {
 			// DeviceState is the deviceState argument value.
 			DeviceState string
 		}
+		// DeviceValueUpdated holds details about calls to the DeviceValueUpdated method.
+		DeviceValueUpdated []struct {
+			// DeviceId is the deviceId argument value.
+			DeviceId string
+			// DeviceValue is the deviceValue argument value.
+			DeviceValue string
+		}
 		// Start holds details about calls to the Start method.
 		Start []struct {
 		}
 	}
 	lockDeviceStateUpdated sync.RWMutex
+	lockDeviceValueUpdated sync.RWMutex
 	lockStart              sync.RWMutex
 }
 
@@ -85,6 +99,41 @@ func (mock *IntegrationIncidentMock) DeviceStateUpdatedCalls() []struct {
 	mock.lockDeviceStateUpdated.RLock()
 	calls = mock.calls.DeviceStateUpdated
 	mock.lockDeviceStateUpdated.RUnlock()
+	return calls
+}
+
+// DeviceValueUpdated calls DeviceValueUpdatedFunc.
+func (mock *IntegrationIncidentMock) DeviceValueUpdated(deviceId string, deviceValue string) error {
+	if mock.DeviceValueUpdatedFunc == nil {
+		panic("IntegrationIncidentMock.DeviceValueUpdatedFunc: method is nil but IntegrationIncident.DeviceValueUpdated was just called")
+	}
+	callInfo := struct {
+		DeviceId    string
+		DeviceValue string
+	}{
+		DeviceId:    deviceId,
+		DeviceValue: deviceValue,
+	}
+	mock.lockDeviceValueUpdated.Lock()
+	mock.calls.DeviceValueUpdated = append(mock.calls.DeviceValueUpdated, callInfo)
+	mock.lockDeviceValueUpdated.Unlock()
+	return mock.DeviceValueUpdatedFunc(deviceId, deviceValue)
+}
+
+// DeviceValueUpdatedCalls gets all the calls that were made to DeviceValueUpdated.
+// Check the length with:
+//     len(mockedIntegrationIncident.DeviceValueUpdatedCalls())
+func (mock *IntegrationIncidentMock) DeviceValueUpdatedCalls() []struct {
+	DeviceId    string
+	DeviceValue string
+} {
+	var calls []struct {
+		DeviceId    string
+		DeviceValue string
+	}
+	mock.lockDeviceValueUpdated.RLock()
+	calls = mock.calls.DeviceValueUpdated
+	mock.lockDeviceValueUpdated.RUnlock()
 	return calls
 }
 

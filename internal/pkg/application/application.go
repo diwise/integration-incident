@@ -3,7 +3,6 @@ package application
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
@@ -15,6 +14,7 @@ import (
 type IntegrationIncident interface {
 	Start() error
 	DeviceStateUpdated(deviceId, deviceState string) error
+	DeviceValueUpdated(deviceId, deviceValue string) error
 }
 
 type app struct {
@@ -23,17 +23,18 @@ type app struct {
 	baseUrl          string
 	port             string
 	previousStates   map[string]string
+	previousValues   map[string]string
 }
 
 func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) error, baseUrl, port string) IntegrationIncident {
-	prevState := make(map[string]string)
 
 	newApp := &app{
 		log:              log,
 		incidentReporter: incidentReporter,
 		baseUrl:          baseUrl,
 		port:             port,
-		previousStates:   prevState,
+		previousStates:   make(map[string]string),
+		previousValues:   make(map[string]string),
 	}
 
 	return newApp
@@ -41,25 +42,8 @@ func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) e
 
 func (a *app) Start() error {
 
-	return a.pollForDevices(a.log, a.baseUrl, a.incidentReporter)
-
-}
-
-func (a *app) pollForDevices(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
-	err := GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
-	if err != nil {
-		return fmt.Errorf("failed to start polling for devices: %s", err.Error())
-	}
-
-	go func() {
-		for {
-			log.Info().Msg("Polling for device status ...")
-			GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
-			time.Sleep(5 * time.Second)
-		}
-	}()
-
 	return nil
+
 }
 
 func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
@@ -74,12 +58,53 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 		return nil
 	}
 
-	err := a.createAndSendIncident(shortId, deviceState)
+	const watermeterCategory int = 17
+	incident := models.NewIncident(watermeterCategory, getDescriptionFromDeviceState(shortId, deviceState)).AtLocation(62.388178, 17.315090)
+
+	err := a.incidentReporter(*incident)
 	if err != nil {
-		return fmt.Errorf("failed to create and send incident: %s", err.Error())
+		log.Err(err).Msg("could not post incident")
+		return err
 	}
 
 	a.updateDeviceState(shortId, deviceState)
+
+	return nil
+}
+
+func (a *app) DeviceValueUpdated(deviceId, deviceValue string) error {
+	if strings.Contains(deviceId, "-livboj-") {
+
+		shortId := strings.TrimPrefix(deviceId, fiware.DeviceIDPrefix)
+		valueChanged := a.checkIfDeviceValueHasChanged(shortId, deviceValue)
+
+		if !valueChanged {
+			return nil
+		}
+
+		if deviceValue == "off" {
+			log.Info().Msgf("state changed to \"off\" on device: %s", shortId)
+
+			const lifebuoyCategory int = 15
+			incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
+
+			device, err := getDeviceFromContextBroker(a.log, a.baseUrl, deviceId)
+
+			if err == nil && device.Location != nil {
+				lon := device.Location.GetAsPoint().Longitude()
+				lat := device.Location.GetAsPoint().Latitude()
+				incident = incident.AtLocation(lat, lon)
+			}
+
+			err = a.incidentReporter(*incident)
+			if err != nil {
+				log.Err(err).Msg("could not post incident")
+				return err
+			}
+		}
+
+		a.updateDeviceValue(shortId, deviceValue)
+	}
 
 	return nil
 }
@@ -88,41 +113,42 @@ func (a *app) updateDeviceState(deviceId, deviceState string) {
 	a.previousStates[deviceId] = deviceState
 }
 
+func (a *app) updateDeviceValue(deviceId, deviceValue string) {
+	a.previousValues[deviceId] = deviceValue
+}
+
 func (a *app) checkIfDeviceStateHasChanged(deviceId, state string) bool {
 	storedState, exists := a.previousStates[deviceId]
 
 	if !exists {
-		log.Info().Msg("device does not exist, saving state...")
+		log.Info().Msgf("device %s does not exist, saving state...", deviceId)
 		a.previousStates[deviceId] = state
 		return false
 	}
 
 	if storedState != state {
-		log.Info().Msg("device state has changed")
+		log.Info().Msgf("device %s state has changed to %s", deviceId, state)
 		return true
 	}
-
-	log.Info().Msg("device state has not changed")
 
 	return false
 }
 
-func (a *app) createAndSendIncident(deviceId, state string) error {
-	const watermeterCategory int = 17
-	incident := models.Incident{
-		PersonId:    "diwise",
-		Category:    watermeterCategory,
-		Description: getDescriptionFromDeviceState(deviceId, state),
+func (a *app) checkIfDeviceValueHasChanged(deviceId, value string) bool {
+	storedValue, exists := a.previousValues[deviceId]
+
+	if !exists {
+		log.Info().Msgf("device %s does not exist, saving value...", deviceId)
+		a.previousValues[deviceId] = value
+		return false
 	}
 
-	log.Info().Msg("sending incident")
-	err := a.incidentReporter(incident)
-	if err != nil {
-		log.Err(err).Msg("could not post incident")
-		return err
+	if storedValue != value {
+		log.Info().Msgf("device %s value has changed to %s", deviceId, value)
+		return true
 	}
 
-	return nil
+	return false
 }
 
 func getDescriptionFromDeviceState(deviceId, state string) string {
