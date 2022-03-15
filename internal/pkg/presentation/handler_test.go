@@ -13,10 +13,9 @@ import (
 
 func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
 	is := is.New(t)
-
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(noDeviceState)))
+	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(noDeviceState)))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
@@ -27,10 +26,9 @@ func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
 
 func TestNotificationHandlerTriggersDeviceStateUpdatedIfDeviceStateExists(t *testing.T) {
 	is := is.New(t)
-
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(createStatusBody("se:servanet:lora:msva:123", "104"))))
+	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBody("se:servanet:lora:msva:123", "104"))))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
@@ -41,10 +39,9 @@ func TestNotificationHandlerTriggersDeviceStateUpdatedIfDeviceStateExists(t *tes
 
 func TestNotificationHandlerDoesNotTriggersDeviceStateUpdatedIfWrongDeviceID(t *testing.T) {
 	is := is.New(t)
-
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(createStatusBody("notawatermeter", "104"))))
+	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBody("notawatermeter", "104"))))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
@@ -55,10 +52,9 @@ func TestNotificationHandlerDoesNotTriggersDeviceStateUpdatedIfWrongDeviceID(t *
 
 func TestNotificationHandlerReturnsBadRequestIfEmptyRequestBody(t *testing.T) {
 	is := is.New(t)
-
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", "/notification", nil)
+	r := httptest.NewRequest("POST", "/api/notify", nil)
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
@@ -67,27 +63,46 @@ func TestNotificationHandlerReturnsBadRequestIfEmptyRequestBody(t *testing.T) {
 
 func TestNotificationHandlerReturnsBadRequestIfRequestBodyCannotBeUnmarshalledToNotification(t *testing.T) {
 	is := is.New(t)
-
 	app := mockApp()
 
-	r := httptest.NewRequest("POST", "/notification", bytes.NewBuffer([]byte(badRequestJson)))
+	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(badRequestJson)))
 	w := httptest.NewRecorder()
 
 	notificationHandler(app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusBadRequest)
 }
 
+func TestNotificationHandlerHandlesUpdatedValueForLifeBuoys(t *testing.T) {
+	is := is.New(t)
+	app := mockApp()
+
+	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBodyWithValue("sn-elt-livboj-01", "on"))))
+	w := httptest.NewRecorder()
+
+	notificationHandler(app).ServeHTTP(w, r)
+	is.Equal(w.Code, http.StatusOK)
+	is.Equal(len(app.DeviceValueUpdatedCalls()), 1)
+}
+
 const badRequestJson string = `{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:123","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41}}`
 const noDeviceState string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:se:servanet:lora:msva:123","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41}}]}`
 const withDeviceStateJsonFormat string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:%s","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41},"deviceState":{"type":"Property","value":"%s"}}]}`
+const withValueJsonFormat string = `{"subscriptionId":"36990e41ccd84af99d8b233eca81d1d3","data":[{"id":"urn:ngsi-ld:Device:%s","type":"Device","rssi":{"type":"Property","value":0.1},"snr":{"type":"Property","value":0.41},"value":{"type":"Property","value":"%s"}}]}`
 
 func createStatusBody(deviceId, state string) string {
 	return fmt.Sprintf(withDeviceStateJsonFormat, deviceId, state)
 }
 
+func createStatusBodyWithValue(deviceId, value string) string {
+	return fmt.Sprintf(withValueJsonFormat, deviceId, value)
+}
+
 func mockApp() *application.IntegrationIncidentMock {
 	return &application.IntegrationIncidentMock{
 		DeviceStateUpdatedFunc: func(deviceId, deviceState string) error {
+			return nil
+		},
+		DeviceValueUpdatedFunc: func(deviceId, deviceState string) error {
 			return nil
 		},
 	}

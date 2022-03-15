@@ -76,6 +76,12 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 						w.WriteHeader(http.StatusInternalServerError)
 						return
 					}
+				} else if strings.Contains(device.ID, "-livboj-") && device.Value != nil {
+					err = app.DeviceValueUpdated(device.ID, device.Value.Value)
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
 				}
 			}
 		}

@@ -15,6 +15,7 @@ import (
 type IntegrationIncident interface {
 	Start() error
 	DeviceStateUpdated(deviceId, deviceState string) error
+	DeviceValueUpdated(deviceId, deviceValue string) error
 }
 
 type app struct {
@@ -81,6 +82,10 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 
 	a.updateDeviceState(shortId, deviceState)
 
+	return nil
+}
+
+func (a *app) DeviceValueUpdated(deviceId, deviceValue string) error {
 	return nil
 }
 
