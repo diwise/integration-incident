@@ -7,15 +7,14 @@ import (
 	"testing"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
-	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
-func TestPostIncident(t *testing.T) {
-	log := zerolog.Logger{}
+func TestPostLifebuouyIncident(t *testing.T) {
 
 	server := setupMockService(http.StatusOK, accessTokenResp)
 
-	incidentReporter, _ := NewIncidentReporter(log, server.URL, "")
+	incidentReporter, _ := NewIncidentReporter(log.Logger, server.URL, "")
 
 	incident := models.Incident{
 		PersonId:       "deviceID",

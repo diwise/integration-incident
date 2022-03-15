@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
-	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
@@ -17,7 +17,7 @@ func TestThatNoReportIsSentOnFirstUpdate(t *testing.T) {
 	})
 	reporter := newIncidentReporterThatReturns(nil)
 
-	err := GetDeviceStatusAndSendReportIfMissing(zerolog.Logger{}, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(log.Logger, server.URL, reporter.f)
 
 	if err != nil {
 		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
@@ -32,10 +32,9 @@ func TestThatAReportIsSentWhenOneIsMissing(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := zerolog.Logger{}
 
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(log.Logger, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(log.Logger, server.URL, reporter.f)
 
 	if err != nil {
 		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
@@ -51,11 +50,11 @@ func TestThatOffStateIsRememberedAndOnlyOneReportIsSent(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := zerolog.Logger{}
+	logger := log.Logger
 
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
 
 	if err != nil {
 		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
@@ -72,12 +71,12 @@ func TestThatANewReportIsSentAfterStateReset(t *testing.T) {
 		{http.StatusOK, livbojJsonOneMissing},
 	})
 	reporter := newIncidentReporterThatReturns(nil)
-	log := zerolog.Logger{}
+	logger := log.Logger
 
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
-	err := GetDeviceStatusAndSendReportIfMissing(log, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
+	GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
+	err := GetDeviceStatusAndSendReportIfMissing(logger, server.URL, reporter.f)
 
 	if err != nil {
 		t.Errorf("GetDeviceStatusAndSendReportIfMissing failed unexpectedly: %s", err.Error())
