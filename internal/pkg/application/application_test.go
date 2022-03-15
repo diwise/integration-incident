@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/matryer/is"
-	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
@@ -37,7 +37,7 @@ func TestThatDeviceStateUpdatedSendsIncidentReportOnStateChanged(t *testing.T) {
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(1))
 	is.Equal(incRep.incidents[0].Description, "devId3 - Låg Batterinivå")
-	is.Equal(incRep.incidents[0].Category, 16)
+	is.Equal(incRep.incidents[0].Category, 17)
 }
 
 func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
@@ -50,14 +50,13 @@ func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
 	is.NoErr(err)
 	is.Equal(incRep.callCount, int32(1))
 	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt Fel: 3")
-	is.Equal(incRep.incidents[0].Category, 16)
+	is.Equal(incRep.incidents[0].Category, 17)
 }
 
 func testSetup(t *testing.T) (*is.I, *incidentReporter, IntegrationIncident) {
 	is := is.New(t)
-	log := zerolog.Logger{}
 	incRep := newIncidentReporterThatReturns(nil)
-	app := NewApplication(log, incRep.f, "", "")
+	app := NewApplication(log.Logger, incRep.f, "", "")
 
 	return is, incRep, app
 }

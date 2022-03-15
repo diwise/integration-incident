@@ -108,12 +108,12 @@ func (a *app) checkIfDeviceStateHasChanged(deviceId, state string) bool {
 }
 
 func (a *app) createAndSendIncident(deviceId, state string) error {
-	const watermeterCategory int = 16
-	incident := models.Incident{}
-
-	incident.PersonId = "diwise"
-	incident.Category = watermeterCategory
-	incident.Description = getDescriptionFromDeviceState(deviceId, state)
+	const watermeterCategory int = 17
+	incident := models.Incident{
+		PersonId:    "diwise",
+		Category:    watermeterCategory,
+		Description: getDescriptionFromDeviceState(deviceId, state),
+	}
 
 	log.Info().Msg("sending incident")
 	err := a.incidentReporter(incident)
