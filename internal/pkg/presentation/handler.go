@@ -36,7 +36,6 @@ func CreateRouterAndStartServing(log zerolog.Logger, app application.Integration
 
 	log.Info().Str("port", servicePort).Msg("starting to listen for connections")
 
-	log.Log().Str("Starting integration on port:%s", servicePort)
 	err := http.ListenAndServe(":"+servicePort, r)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to listen for connections")
@@ -75,9 +74,12 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 					err = app.DeviceStateUpdated(device.ID, device.DeviceState.Value)
 					if err != nil {
 						w.WriteHeader(http.StatusInternalServerError)
+						return
 					}
 				}
 			}
 		}
+
+		w.WriteHeader(http.StatusOK)
 	})
 }
