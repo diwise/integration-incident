@@ -41,22 +41,25 @@ func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) e
 
 func (a *app) Start() error {
 
-	go a.RunPoll(a.log, a.baseUrl, a.incidentReporter)
+	return a.pollForDevices(a.log, a.baseUrl, a.incidentReporter)
 
-	return nil
 }
 
-func (a *app) RunPoll(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
+func (a *app) pollForDevices(log zerolog.Logger, baseUrl string, incidentReporter func(models.Incident) error) error {
 	err := GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
 	if err != nil {
 		return fmt.Errorf("failed to start polling for devices: %s", err.Error())
 	}
 
-	for {
-		log.Info().Msg("Polling for device status ...")
-		GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
-		time.Sleep(5 * time.Second)
-	}
+	go func() {
+		for {
+			log.Info().Msg("Polling for device status ...")
+			GetDeviceStatusAndSendReportIfMissing(log, baseUrl, incidentReporter)
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
+	return nil
 }
 
 func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
