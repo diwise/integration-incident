@@ -127,7 +127,7 @@ func (a *app) checkIfDeviceStateHasChanged(deviceId, state string) bool {
 	}
 
 	if storedState != state {
-		log.Info().Msgf("device %s state has changed to %s", deviceId, state)
+		log.Info().Msgf("device %s state has changed from %s to %s", deviceId, storedState, state)
 		return true
 	}
 
