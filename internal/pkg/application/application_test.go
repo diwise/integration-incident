@@ -19,11 +19,24 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testin
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "0")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 
-	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "0")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
+	is.NoErr(err)
+	incRep.assertNotCalled(is)
+}
+
+func TestThatDeviceStateUpdatedDoesNotSendIncidentWhenUpdatedStateIsNoError(t *testing.T) {
+	is, incRep, app := testSetup(t)
+
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
+	is.NoErr(err)
+	incRep.assertNotCalled(is)
+
+	const stateNoError string = "0"
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", stateNoError)
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }

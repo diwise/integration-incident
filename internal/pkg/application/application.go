@@ -58,13 +58,17 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 		return nil
 	}
 
-	const watermeterCategory int = 17
-	incident := models.NewIncident(watermeterCategory, getDescriptionFromDeviceState(shortId, deviceState)).AtLocation(62.388178, 17.315090)
+	const stateNoError string = "0"
 
-	err := a.incidentReporter(*incident)
-	if err != nil {
-		log.Err(err).Msg("could not post incident")
-		return err
+	if deviceState != stateNoError {
+		const watermeterCategory int = 17
+		incident := models.NewIncident(watermeterCategory, getDescriptionFromDeviceState(shortId, deviceState)).AtLocation(62.388178, 17.315090)
+
+		err := a.incidentReporter(*incident)
+		if err != nil {
+			log.Err(err).Msg("could not post incident")
+			return err
+		}
 	}
 
 	a.updateDeviceState(shortId, deviceState)
