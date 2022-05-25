@@ -11,10 +11,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+//go:generate moq -rm -out application_mock.go . IntegrationIncident
+
 type IntegrationIncident interface {
 	Start() error
 	DeviceStateUpdated(deviceId, deviceState string) error
-	DeviceValueUpdated(deviceId, deviceValue string) error
+	LifebuoyValueUpdated(deviceId, deviceValue string) error
 }
 
 type app struct {
@@ -76,7 +78,7 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 	return nil
 }
 
-func (a *app) DeviceValueUpdated(deviceId, deviceValue string) error {
+func (a *app) LifebuoyValueUpdated(deviceId, deviceValue string) error {
 	if strings.Contains(deviceId, "-livboj-") {
 
 		shortId := strings.TrimPrefix(deviceId, fiware.DeviceIDPrefix)
@@ -92,11 +94,11 @@ func (a *app) DeviceValueUpdated(deviceId, deviceValue string) error {
 			const lifebuoyCategory int = 15
 			incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
 
-			device, err := getDeviceFromContextBroker(a.log, a.baseUrl, deviceId)
+			lifebuoy, err := getLifebuoyFromContextBroker(a.log, a.baseUrl, deviceId)
 
-			if err == nil && device.Location != nil {
-				lon := device.Location.GetAsPoint().Longitude()
-				lat := device.Location.GetAsPoint().Latitude()
+			if err == nil {
+				lon := lifebuoy.Location.GetAsPoint().Longitude()
+				lat := lifebuoy.Location.GetAsPoint().Latitude()
 				incident = incident.AtLocation(lat, lon)
 			}
 

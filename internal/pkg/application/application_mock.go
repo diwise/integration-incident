@@ -20,8 +20,8 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 // 			DeviceStateUpdatedFunc: func(deviceId string, deviceState string) error {
 // 				panic("mock out the DeviceStateUpdated method")
 // 			},
-// 			DeviceValueUpdatedFunc: func(deviceId string, deviceValue string) error {
-// 				panic("mock out the DeviceValueUpdated method")
+// 			LifebuoyValueUpdatedFunc: func(deviceId string, deviceValue string) error {
+// 				panic("mock out the LifebuoyValueUpdated method")
 // 			},
 // 			StartFunc: func() error {
 // 				panic("mock out the Start method")
@@ -36,8 +36,8 @@ type IntegrationIncidentMock struct {
 	// DeviceStateUpdatedFunc mocks the DeviceStateUpdated method.
 	DeviceStateUpdatedFunc func(deviceId string, deviceState string) error
 
-	// DeviceValueUpdatedFunc mocks the DeviceValueUpdated method.
-	DeviceValueUpdatedFunc func(deviceId string, deviceValue string) error
+	// LifebuoyValueUpdatedFunc mocks the LifebuoyValueUpdated method.
+	LifebuoyValueUpdatedFunc func(deviceId string, deviceValue string) error
 
 	// StartFunc mocks the Start method.
 	StartFunc func() error
@@ -51,8 +51,8 @@ type IntegrationIncidentMock struct {
 			// DeviceState is the deviceState argument value.
 			DeviceState string
 		}
-		// DeviceValueUpdated holds details about calls to the DeviceValueUpdated method.
-		DeviceValueUpdated []struct {
+		// LifebuoyValueUpdated holds details about calls to the LifebuoyValueUpdated method.
+		LifebuoyValueUpdated []struct {
 			// DeviceId is the deviceId argument value.
 			DeviceId string
 			// DeviceValue is the deviceValue argument value.
@@ -62,9 +62,9 @@ type IntegrationIncidentMock struct {
 		Start []struct {
 		}
 	}
-	lockDeviceStateUpdated sync.RWMutex
-	lockDeviceValueUpdated sync.RWMutex
-	lockStart              sync.RWMutex
+	lockDeviceStateUpdated   sync.RWMutex
+	lockLifebuoyValueUpdated sync.RWMutex
+	lockStart                sync.RWMutex
 }
 
 // DeviceStateUpdated calls DeviceStateUpdatedFunc.
@@ -102,10 +102,10 @@ func (mock *IntegrationIncidentMock) DeviceStateUpdatedCalls() []struct {
 	return calls
 }
 
-// DeviceValueUpdated calls DeviceValueUpdatedFunc.
-func (mock *IntegrationIncidentMock) DeviceValueUpdated(deviceId string, deviceValue string) error {
-	if mock.DeviceValueUpdatedFunc == nil {
-		panic("IntegrationIncidentMock.DeviceValueUpdatedFunc: method is nil but IntegrationIncident.DeviceValueUpdated was just called")
+// LifebuoyValueUpdated calls LifebuoyValueUpdatedFunc.
+func (mock *IntegrationIncidentMock) LifebuoyValueUpdated(deviceId string, deviceValue string) error {
+	if mock.LifebuoyValueUpdatedFunc == nil {
+		panic("IntegrationIncidentMock.LifebuoyValueUpdatedFunc: method is nil but IntegrationIncident.LifebuoyValueUpdated was just called")
 	}
 	callInfo := struct {
 		DeviceId    string
@@ -114,16 +114,16 @@ func (mock *IntegrationIncidentMock) DeviceValueUpdated(deviceId string, deviceV
 		DeviceId:    deviceId,
 		DeviceValue: deviceValue,
 	}
-	mock.lockDeviceValueUpdated.Lock()
-	mock.calls.DeviceValueUpdated = append(mock.calls.DeviceValueUpdated, callInfo)
-	mock.lockDeviceValueUpdated.Unlock()
-	return mock.DeviceValueUpdatedFunc(deviceId, deviceValue)
+	mock.lockLifebuoyValueUpdated.Lock()
+	mock.calls.LifebuoyValueUpdated = append(mock.calls.LifebuoyValueUpdated, callInfo)
+	mock.lockLifebuoyValueUpdated.Unlock()
+	return mock.LifebuoyValueUpdatedFunc(deviceId, deviceValue)
 }
 
-// DeviceValueUpdatedCalls gets all the calls that were made to DeviceValueUpdated.
+// LifebuoyValueUpdatedCalls gets all the calls that were made to LifebuoyValueUpdated.
 // Check the length with:
-//     len(mockedIntegrationIncident.DeviceValueUpdatedCalls())
-func (mock *IntegrationIncidentMock) DeviceValueUpdatedCalls() []struct {
+//     len(mockedIntegrationIncident.LifebuoyValueUpdatedCalls())
+func (mock *IntegrationIncidentMock) LifebuoyValueUpdatedCalls() []struct {
 	DeviceId    string
 	DeviceValue string
 } {
@@ -131,9 +131,9 @@ func (mock *IntegrationIncidentMock) DeviceValueUpdatedCalls() []struct {
 		DeviceId    string
 		DeviceValue string
 	}
-	mock.lockDeviceValueUpdated.RLock()
-	calls = mock.calls.DeviceValueUpdated
-	mock.lockDeviceValueUpdated.RUnlock()
+	mock.lockLifebuoyValueUpdated.RLock()
+	calls = mock.calls.LifebuoyValueUpdated
+	mock.lockLifebuoyValueUpdated.RUnlock()
 	return calls
 }
 

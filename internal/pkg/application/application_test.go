@@ -70,7 +70,7 @@ func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
 func TestThatDeviceValueUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "off")
+	err := app.LifebuoyValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "off")
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -78,11 +78,11 @@ func TestThatDeviceValueUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testin
 func TestThatDeviceValueUpdatedDoesNotSendIncidentIfDeviceValueIsTheSame(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "on")
+	err := app.LifebuoyValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "on")
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 
-	err = app.DeviceValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "on")
+	err = app.LifebuoyValueUpdated("urn:ngsi-ld:Device:elt-livboj-01", "on")
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -90,10 +90,10 @@ func TestThatDeviceValueUpdatedDoesNotSendIncidentIfDeviceValueIsTheSame(t *test
 func TestThatDeviceValueUpdatedSendsIncidentReportOnValueChanged(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceValueUpdated("urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-02", "on")
+	err := app.LifebuoyValueUpdated("urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-02", "on")
 	is.NoErr(err)
 
-	err = app.DeviceValueUpdated("urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-02", "off")
+	err = app.LifebuoyValueUpdated("urn:ngsi-ld:Device:se:servanet:lora:sn-elt-livboj-02", "off")
 	is.NoErr(err)
 	incRep.assertCalledOnce(is)
 	is.Equal(incRep.incidents[0].Description, "Livboj kan ha flyttats eller utsatts för åverkan.")

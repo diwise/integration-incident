@@ -3,6 +3,7 @@ package presentation
 import (
 	"compress/flate"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -46,6 +47,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, app application.Integration
 
 func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
 		notif := api.Notification{}
 
 		bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -62,30 +64,80 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 			return
 		}
 
-		if notif.SubscriptionID == "" {
+		if notif.SubscriptionId == "" {
 			log.Err(err).Msg("request body is not a valid notification")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if len(notif.Data) != 0 {
-			for _, device := range notif.Data {
-				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
-					err = app.DeviceStateUpdated(device.ID, device.DeviceState.Value)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-				} else if strings.Contains(device.ID, "-livboj-") && device.Value != nil {
-					err = app.DeviceValueUpdated(device.ID, device.Value.Value)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
+			for _, r := range notif.Data {
+				t := r["type"].(string)
+				switch t {
+				case "Device":
+					err = handleDevice(app, r)
+				case "Lifebuoy":
+					err = handleLifebuoy(app, r)
+				default:
+					log.Warn().Msgf("could not handle type %s", t)
+				}
+
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
 				}
 			}
 		}
 
 		w.WriteHeader(http.StatusOK)
 	})
+}
+
+func handleDevice(app application.IntegrationIncident, r map[string]interface{}) error {
+	id, ok := getStringFromMap("id", r)
+	if !ok {
+		return fmt.Errorf("could not find id")
+	}
+
+	state, ok := getStringFromMap("deviceState", r)
+	if !ok {
+		return nil
+	}
+
+	if strings.Contains(id, "se:servanet:lora:msva:") && state != "" {
+		err := app.DeviceStateUpdated(id, state)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func handleLifebuoy(app application.IntegrationIncident, r map[string]interface{}) error {
+	id, ok := getStringFromMap("id", r)
+	if !ok {
+		return fmt.Errorf("could not find id")
+	}
+
+	status, ok := getStringFromMap("status", r)
+	if !ok {
+		return nil
+	}
+
+	if status != "" {
+		err := app.LifebuoyValueUpdated(id, status)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func getStringFromMap(key string, m map[string]interface{}) (string, bool) {
+	if val, ok := m[key]; ok {
+		if s, ok := val.(string); ok {
+			return s, true
+		}
+	}
+	return "", false
 }

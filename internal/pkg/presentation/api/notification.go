@@ -1,8 +1,9 @@
 package api
 
-import "github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
-
 type Notification struct {
-	SubscriptionID string          `json:"subscriptionId"`
-	Data           []fiware.Device `json:"data"`
+	Id             string                   `json:"id"`
+	Type           string                   `json:"type"`
+	SubscriptionId string                   `json:"subscriptionId"`
+	NotifiedAt     string                   `json:"notifiedAt"`
+	Data           []map[string]interface{} `json:"data"`
 }
