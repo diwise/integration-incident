@@ -46,6 +46,7 @@ func CreateRouterAndStartServing(log zerolog.Logger, app application.Integration
 
 func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var err error
 		notif := api.Notification{}
 
 		bodyBytes, err := ioutil.ReadAll(r.Body)
@@ -62,26 +63,21 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 			return
 		}
 
-		if notif.SubscriptionID == "" {
+		if notif.SubscriptionId == "" {
 			log.Err(err).Msg("request body is not a valid notification")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		if len(notif.Data) != 0 {
-			for _, device := range notif.Data {
-				if strings.Contains(device.ID, "se:servanet:lora:msva:") && device.DeviceState != nil {
-					err = app.DeviceStateUpdated(device.ID, device.DeviceState.Value)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-				} else if strings.Contains(device.ID, "-livboj-") && device.Value != nil {
-					err = app.DeviceValueUpdated(device.ID, device.Value.Value)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
+		for _, n := range notif.Data {
+			switch n.Type {
+			case "Device":
+				if n.DeviceState != nil && strings.Contains(n.Id, "se:servanet:lora:msva:") {
+					app.DeviceStateUpdated(n.Id, n.DeviceState.Value)
+				}
+			case "Lifebuoy":
+				if n.Status != nil {
+					app.LifebuoyValueUpdated(n.Id, n.Status.Value)
 				}
 			}
 		}
