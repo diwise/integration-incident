@@ -2,14 +2,12 @@ package presentation
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/diwise/integration-incident/internal/pkg/application"
-	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
+	"github.com/diwise/integration-incident/internal/pkg/application"	
 	"github.com/matryer/is"
 )
 
@@ -86,23 +84,6 @@ func TestNotificationHandlerHandlesUpdatedValueForLifeBuoys(t *testing.T) {
 	is.Equal(len(app.LifebuoyValueUpdatedCalls()), 1)
 }
 
-func TestNotificationLD(t *testing.T) {
-	is := is.New(t)
-	n := api.Notification{}
-	json.Unmarshal([]byte(lifebuoy_on), &n)
-
-	if len(n.Data) != 0 {
-		for _, r := range n.Data {
-
-			t := r["type"].(string)
-			f := r["status"].(string)
-
-			is.Equal("Lifebuoy", t)
-			is.Equal("on", f)
-		}
-	}
-}
-
 func createStatusBody(deviceId, state string) string {
 	return fmt.Sprintf(withDeviceStateJsonFormat, deviceId, state)
 }
@@ -144,8 +125,11 @@ const withDeviceStateJsonFormat string = `{
 			"id": "urn:ngsi-ld:Device:%s",
 			"type": "Device",
 			"rssi": 0.1,	
-			"snr": 0.41,
-			"deviceState": "%s"
+			"snr": 0.41,			
+			"deviceState": {
+				"type": "Property",
+				"value": "%s"
+			}			
 		}
 	]
 }`
@@ -157,23 +141,11 @@ const withValueJsonFormat string = `{
 			"type": "Lifebuoy",
 			"rssi": 0.1,
 			"snr":  0.41,		
-			"status": "%s"		
+			"status": {
+				"type": "Property",
+				"value": "%s"
+			}					
 		}
 	]
 }`
 
-const lifebuoy_on string = `
-{
-	"id": "urn:ngsi-ld:Notification:628cce184ed0912f6cad226e",
-	"type": "Notification",
-	"subscriptionId": "urn:ngsi-ld:Subscription:628ccdd44ed0912f6cad226d",
-	"notifiedAt": "2022-05-24T12:22:48.505Z",
-	"data": [
-		{
-			"id": "urn:ngsi-ld:Lifebuoy:deviceID-001",
-			"type": "Lifebuoy",
-			"status": "on"	  
-		}
-	]
-}
-`

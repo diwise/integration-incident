@@ -97,9 +97,8 @@ func (a *app) LifebuoyValueUpdated(deviceId, deviceValue string) error {
 			lifebuoy, err := getLifebuoyFromContextBroker(a.log, a.baseUrl, deviceId)
 
 			if err == nil {
-				lon := lifebuoy.Location.GetAsPoint().Longitude()
-				lat := lifebuoy.Location.GetAsPoint().Latitude()
-				incident = incident.AtLocation(lat, lon)
+				point := lifebuoy.Location.GetAsPoint()
+				incident = incident.AtLocation(point.Latitude(), point.Longitude())
 			}
 
 			err = a.incidentReporter(*incident)
