@@ -31,11 +31,6 @@ func main() {
 
 	app := application.NewApplication(log, incidentReporter, baseUrl, port)
 
-	err = app.Start()
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start application")
-	}
-
 	err = presentation.CreateRouterAndStartServing(log, app, port)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to start router")

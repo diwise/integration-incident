@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/diwise"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
 
 	"github.com/rs/zerolog"
@@ -14,7 +15,6 @@ import (
 //go:generate moq -rm -out application_mock.go . IntegrationIncident
 
 type IntegrationIncident interface {
-	Start() error
 	DeviceStateUpdated(deviceId, deviceState string) error
 	LifebuoyValueUpdated(deviceId, deviceValue string) error
 }
@@ -40,12 +40,6 @@ func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) e
 	}
 
 	return newApp
-}
-
-func (a *app) Start() error {
-
-	return nil
-
 }
 
 func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
@@ -79,37 +73,38 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 }
 
 func (a *app) LifebuoyValueUpdated(deviceId, deviceValue string) error {
-	if strings.Contains(deviceId, "-livboj-") {
-
-		shortId := strings.TrimPrefix(deviceId, fiware.DeviceIDPrefix)
-		valueChanged := a.checkIfDeviceValueHasChanged(shortId, deviceValue)
-
-		if !valueChanged {
-			return nil
-		}
-
-		if deviceValue == "off" {
-			log.Info().Msgf("state changed to \"off\" on device: %s", shortId)
-
-			const lifebuoyCategory int = 15
-			incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
-
-			lifebuoy, err := getLifebuoyFromContextBroker(a.log, a.baseUrl, deviceId)
-
-			if err == nil {
-				point := lifebuoy.Location.GetAsPoint()
-				incident = incident.AtLocation(point.Latitude(), point.Longitude())
-			}
-
-			err = a.incidentReporter(*incident)
-			if err != nil {
-				log.Err(err).Msg("could not post incident")
-				return err
-			}
-		}
-
-		a.updateDeviceValue(shortId, deviceValue)
+	if !strings.HasPrefix(deviceId, diwise.LifebuoyIDPrefix) {
+		return fmt.Errorf("device with id %s is not supported", deviceId)
 	}
+
+	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
+	valueChanged := a.checkIfDeviceValueHasChanged(shortId, deviceValue)
+
+	if !valueChanged {
+		return nil
+	}
+
+	if deviceValue == "off" {
+		log.Info().Msgf("state changed to \"off\" on device: %s", shortId)
+
+		const lifebuoyCategory int = 15
+		incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
+
+		lifebuoy, err := getLifebuoyFromContextBroker(a.log, a.baseUrl, deviceId)
+
+		if err == nil {
+			point := lifebuoy.Location.GetAsPoint()
+			incident = incident.AtLocation(point.Latitude(), point.Longitude())
+		}
+
+		err = a.incidentReporter(*incident)
+		if err != nil {
+			log.Err(err).Msg("could not post incident")
+			return err
+		}
+	}
+
+	a.updateDeviceValue(shortId, deviceValue)
 
 	return nil
 }
