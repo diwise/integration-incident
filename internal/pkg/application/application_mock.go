@@ -23,9 +23,6 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 // 			LifebuoyValueUpdatedFunc: func(deviceId string, deviceValue string) error {
 // 				panic("mock out the LifebuoyValueUpdated method")
 // 			},
-// 			StartFunc: func() error {
-// 				panic("mock out the Start method")
-// 			},
 // 		}
 //
 // 		// use mockedIntegrationIncident in code that requires IntegrationIncident
@@ -38,9 +35,6 @@ type IntegrationIncidentMock struct {
 
 	// LifebuoyValueUpdatedFunc mocks the LifebuoyValueUpdated method.
 	LifebuoyValueUpdatedFunc func(deviceId string, deviceValue string) error
-
-	// StartFunc mocks the Start method.
-	StartFunc func() error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,13 +52,9 @@ type IntegrationIncidentMock struct {
 			// DeviceValue is the deviceValue argument value.
 			DeviceValue string
 		}
-		// Start holds details about calls to the Start method.
-		Start []struct {
-		}
 	}
 	lockDeviceStateUpdated   sync.RWMutex
 	lockLifebuoyValueUpdated sync.RWMutex
-	lockStart                sync.RWMutex
 }
 
 // DeviceStateUpdated calls DeviceStateUpdatedFunc.
@@ -134,31 +124,5 @@ func (mock *IntegrationIncidentMock) LifebuoyValueUpdatedCalls() []struct {
 	mock.lockLifebuoyValueUpdated.RLock()
 	calls = mock.calls.LifebuoyValueUpdated
 	mock.lockLifebuoyValueUpdated.RUnlock()
-	return calls
-}
-
-// Start calls StartFunc.
-func (mock *IntegrationIncidentMock) Start() error {
-	if mock.StartFunc == nil {
-		panic("IntegrationIncidentMock.StartFunc: method is nil but IntegrationIncident.Start was just called")
-	}
-	callInfo := struct {
-	}{}
-	mock.lockStart.Lock()
-	mock.calls.Start = append(mock.calls.Start, callInfo)
-	mock.lockStart.Unlock()
-	return mock.StartFunc()
-}
-
-// StartCalls gets all the calls that were made to Start.
-// Check the length with:
-//     len(mockedIntegrationIncident.StartCalls())
-func (mock *IntegrationIncidentMock) StartCalls() []struct {
-} {
-	var calls []struct {
-	}
-	mock.lockStart.RLock()
-	calls = mock.calls.Start
-	mock.lockStart.RUnlock()
 	return calls
 }
