@@ -2,6 +2,7 @@ package application
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
@@ -152,19 +153,57 @@ func (a *app) checkIfDeviceValueHasChanged(deviceId, value string) bool {
 }
 
 func getDescriptionFromDeviceState(deviceId, state string) string {
+	s, _ := strconv.ParseUint(state, 10, 8)
+	m := getStatusMessage(uint8(s))
 
-	description, ok := deviceStateDescriptions[state]
-	if !ok {
-		description = fmt.Sprintf("Okänt Fel: %s", state)
-	}
-
-	return fmt.Sprintf("%s - %s", deviceId, description)
+	return fmt.Sprintf("%s - %s", deviceId, strings.Join(m, " "))
 }
 
+func getStatusMessage(code uint8) []string {
+	var statusMessages []string
+
+	if code == 0x00 {
+		statusMessages = append(statusMessages, "Inga fel")
+	} else {
+		if code&0x04 == 0x04 {
+			statusMessages = append(statusMessages, "Låg batterinivå")
+		}
+		if code&0x08 == 0x08 {
+			statusMessages = append(statusMessages, "Permanent fel")
+		}
+		if code&0x10 == 0x10 {
+			statusMessages = append(statusMessages, "Temporärt fel")
+		}
+		if code&0x10 == 0x10 && code&0x20 != 0x20 && code&0xA0 != 0xA0 && code&0x60 != 0x60 && code&0x80 != 0x80 {
+			statusMessages = append(statusMessages, "Tomt rör")
+		}
+		if code&0x60 == 0x60 {
+			statusMessages = append(statusMessages, "Backflöde")
+		}
+		if code&0xA0 == 0xA0 {
+			statusMessages = append(statusMessages, "Spricka")
+		}
+		if code&0x20 == 0x20 && code&0x40 != 0x40 && code&0x80 != 0x80 {
+			statusMessages = append(statusMessages, "Läckage")
+		}
+		if code&0x80 == 0x80 && code&0x20 != 0x20 {
+			statusMessages = append(statusMessages, "Is eller Frys Varning")
+		}
+	}
+
+	if len(statusMessages) == 0 {
+		statusMessages = append(statusMessages, fmt.Sprintf("Okänt fel: %d", code))
+	}
+
+	return statusMessages
+}
+
+/*
 var deviceStateDescriptions map[string]string = map[string]string{
 	"0":   "Inga Fel",
 	"4":   "Låg Batterinivå",
 	"8":   "Permanent Fel",
+	"12" : "Permanent Fel Låg Betterinivå",
 	"16":  "Temporärt Fel Tomt Rör",
 	"18":  "Låg Betterinivå Permanent Fel",
 	"20":  "Tomt Rör och Temporärt Fel Låg Batterinivå",
@@ -187,3 +226,4 @@ var deviceStateDescriptions map[string]string = map[string]string{
 	"184": "Permanent Fel och Temporärt Fel Spricka eller Öppet Rör",
 	"188": "Permanent Fel Låg Batterinivå och Temporärt Fel Spricka eller Öppet Rör",
 }
+*/

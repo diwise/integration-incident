@@ -50,7 +50,7 @@ func TestThatDeviceStateUpdatedSendsIncidentReportOnStateChanged(t *testing.T) {
 	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", "4")
 	is.NoErr(err)
 	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId3 - Låg Batterinivå")
+	is.Equal(incRep.incidents[0].Description, "devId3 - Låg batterinivå")
 	is.Equal(incRep.incidents[0].Category, 17)
 }
 
@@ -63,7 +63,7 @@ func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
 	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", "3")
 	is.NoErr(err)
 	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt Fel: 3")
+	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt fel: 3")
 	is.Equal(incRep.incidents[0].Category, 17)
 }
 
