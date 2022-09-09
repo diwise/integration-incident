@@ -12,6 +12,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/cloudevents/sdk-go/v2/client"
 	"github.com/diwise/integration-incident/internal/pkg/application"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -69,16 +70,12 @@ func cloudeventReceiveHandler(h *client.EventReceiver) http.HandlerFunc {
 func receive(app application.IntegrationIncident) func(context.Context, cloudevents.Event) {
 	return func(ctx context.Context, event cloudevents.Event) {
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
-			statusMessage := struct {
-				DeviceID   string `json:"deviceID"`
-				StatusCode int    `json:"statusCode"`
-				Timestamp  string `json:"timestamp"`
-			}{}
+			statusMessage := models.StatusMessage{}
 
 			json.Unmarshal(event.Data(), &statusMessage)
 
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
-				app.DeviceStateUpdated(statusMessage.DeviceID, strconv.Itoa(statusMessage.StatusCode))
+				app.DeviceStateUpdated(statusMessage.DeviceID, statusMessage)
 			}
 		}
 	}
@@ -113,7 +110,10 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 			switch n.Type {
 			case "Device":
 				if n.DeviceState != nil && strings.Contains(n.Id, "se:servanet:lora:msva:") {
-					app.DeviceStateUpdated(n.Id, n.DeviceState.Value)
+					code, _ := strconv.Atoi(n.DeviceState.Value)
+					s := models.NewStatusMessage(n.Id, code)
+					// TODO: remove code block?
+					app.DeviceStateUpdated(n.Id, s)
 				}
 			case "Lifebuoy":
 				if n.Status != nil {

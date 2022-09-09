@@ -4,6 +4,7 @@
 package application
 
 import (
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"sync"
 )
 
@@ -17,7 +18,7 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 //
 // 		// make and configure a mocked IntegrationIncident
 // 		mockedIntegrationIncident := &IntegrationIncidentMock{
-// 			DeviceStateUpdatedFunc: func(deviceId string, deviceState string) error {
+// 			DeviceStateUpdatedFunc: func(deviceId string, statusMessage models.StatusMessage) error {
 // 				panic("mock out the DeviceStateUpdated method")
 // 			},
 // 			LifebuoyValueUpdatedFunc: func(deviceId string, deviceValue string) error {
@@ -31,7 +32,7 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 // 	}
 type IntegrationIncidentMock struct {
 	// DeviceStateUpdatedFunc mocks the DeviceStateUpdated method.
-	DeviceStateUpdatedFunc func(deviceId string, deviceState string) error
+	DeviceStateUpdatedFunc func(deviceId string, statusMessage models.StatusMessage) error
 
 	// LifebuoyValueUpdatedFunc mocks the LifebuoyValueUpdated method.
 	LifebuoyValueUpdatedFunc func(deviceId string, deviceValue string) error
@@ -42,8 +43,8 @@ type IntegrationIncidentMock struct {
 		DeviceStateUpdated []struct {
 			// DeviceId is the deviceId argument value.
 			DeviceId string
-			// DeviceState is the deviceState argument value.
-			DeviceState string
+			// StatusMessage is the statusMessage argument value.
+			StatusMessage models.StatusMessage
 		}
 		// LifebuoyValueUpdated holds details about calls to the LifebuoyValueUpdated method.
 		LifebuoyValueUpdated []struct {
@@ -58,33 +59,33 @@ type IntegrationIncidentMock struct {
 }
 
 // DeviceStateUpdated calls DeviceStateUpdatedFunc.
-func (mock *IntegrationIncidentMock) DeviceStateUpdated(deviceId string, deviceState string) error {
+func (mock *IntegrationIncidentMock) DeviceStateUpdated(deviceId string, statusMessage models.StatusMessage) error {
 	if mock.DeviceStateUpdatedFunc == nil {
 		panic("IntegrationIncidentMock.DeviceStateUpdatedFunc: method is nil but IntegrationIncident.DeviceStateUpdated was just called")
 	}
 	callInfo := struct {
-		DeviceId    string
-		DeviceState string
+		DeviceId      string
+		StatusMessage models.StatusMessage
 	}{
-		DeviceId:    deviceId,
-		DeviceState: deviceState,
+		DeviceId:      deviceId,
+		StatusMessage: statusMessage,
 	}
 	mock.lockDeviceStateUpdated.Lock()
 	mock.calls.DeviceStateUpdated = append(mock.calls.DeviceStateUpdated, callInfo)
 	mock.lockDeviceStateUpdated.Unlock()
-	return mock.DeviceStateUpdatedFunc(deviceId, deviceState)
+	return mock.DeviceStateUpdatedFunc(deviceId, statusMessage)
 }
 
 // DeviceStateUpdatedCalls gets all the calls that were made to DeviceStateUpdated.
 // Check the length with:
 //     len(mockedIntegrationIncident.DeviceStateUpdatedCalls())
 func (mock *IntegrationIncidentMock) DeviceStateUpdatedCalls() []struct {
-	DeviceId    string
-	DeviceState string
+	DeviceId      string
+	StatusMessage models.StatusMessage
 } {
 	var calls []struct {
-		DeviceId    string
-		DeviceState string
+		DeviceId      string
+		StatusMessage models.StatusMessage
 	}
 	mock.lockDeviceStateUpdated.RLock()
 	calls = mock.calls.DeviceStateUpdated

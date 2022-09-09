@@ -7,7 +7,6 @@ import (
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/diwise"
-	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/fiware"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -16,7 +15,7 @@ import (
 //go:generate moq -rm -out application_mock.go . IntegrationIncident
 
 type IntegrationIncident interface {
-	DeviceStateUpdated(deviceId, deviceState string) error
+	DeviceStateUpdated(deviceId string, statusMessage models.StatusMessage) error
 	LifebuoyValueUpdated(deviceId, deviceValue string) error
 }
 
@@ -43,13 +42,14 @@ func NewApplication(log zerolog.Logger, incidentReporter func(models.Incident) e
 	return newApp
 }
 
-func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
-	prefix := fiware.DeviceIDPrefix + "se:servanet:lora:msva:"
-	if !strings.HasPrefix(deviceId, prefix) {
+func (a *app) DeviceStateUpdated(deviceId string, sm models.StatusMessage) error {
+
+	if !strings.Contains(deviceId, "se:servanet:lora:msva:") {
 		return fmt.Errorf("device with id %s is not supported", deviceId)
 	}
 
-	shortId := strings.TrimPrefix(deviceId, prefix)
+	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
+	deviceState := strconv.Itoa(sm.Status.Code)
 
 	if !a.checkIfDeviceStateHasChanged(shortId, deviceState) {
 		return nil
@@ -59,7 +59,7 @@ func (a *app) DeviceStateUpdated(deviceId, deviceState string) error {
 
 	if deviceState != stateNoError {
 		const watermeterCategory int = 17
-		incident := models.NewIncident(watermeterCategory, getDescriptionFromDeviceState(shortId, deviceState)).AtLocation(62.388178, 17.315090)
+		incident := models.NewIncident(watermeterCategory, translateJoin(shortId, sm)).AtLocation(62.388178, 17.315090)
 
 		err := a.incidentReporter(*incident)
 		if err != nil {
@@ -152,78 +152,54 @@ func (a *app) checkIfDeviceValueHasChanged(deviceId, value string) bool {
 	return false
 }
 
-func getDescriptionFromDeviceState(deviceId, state string) string {
-	s, _ := strconv.ParseUint(state, 10, 8)
-	m := getStatusMessage(uint8(s))
-
-	return fmt.Sprintf("%s - %s", deviceId, strings.Join(m, " "))
+func translateJoin(deviceID string, sm models.StatusMessage) string {
+	return fmt.Sprintf("%s - %s", deviceID, Join(sm.Status.Messages, " ", translate))
 }
 
-func getStatusMessage(code uint8) []string {
-	var statusMessages []string
-
-	if code == 0x00 {
-		statusMessages = append(statusMessages, "Inga fel")
-	} else {
-		if code&0x04 == 0x04 {
-			statusMessages = append(statusMessages, "Låg batterinivå")
-		}
-		if code&0x08 == 0x08 {
-			statusMessages = append(statusMessages, "Permanent fel")
-		}
-		if code&0x10 == 0x10 {
-			statusMessages = append(statusMessages, "Temporärt fel")
-		}
-		if code&0x10 == 0x10 && code&0x20 != 0x20 && code&0xA0 != 0xA0 && code&0x60 != 0x60 && code&0x80 != 0x80 {
-			statusMessages = append(statusMessages, "Tomt rör")
-		}
-		if code&0x60 == 0x60 {
-			statusMessages = append(statusMessages, "Backflöde")
-		}
-		if code&0xA0 == 0xA0 {
-			statusMessages = append(statusMessages, "Spricka")
-		}
-		if code&0x20 == 0x20 && code&0x40 != 0x40 && code&0x80 != 0x80 {
-			statusMessages = append(statusMessages, "Läckage")
-		}
-		if code&0x80 == 0x80 && code&0x20 != 0x20 {
-			statusMessages = append(statusMessages, "Is eller Frys Varning")
-		}
+func Join(elems []string, sep string, mod func(string) string) string {
+	switch len(elems) {
+	case 0:
+		return ""
+	case 1:
+		return mod(elems[0])
+	}
+	n := len(sep) * (len(elems) - 1)
+	for i := 0; i < len(elems); i++ {
+		n += len(elems[i])
 	}
 
-	if len(statusMessages) == 0 {
-		statusMessages = append(statusMessages, fmt.Sprintf("Okänt fel: %d", code))
+	var b strings.Builder
+	b.Grow(n)
+	b.WriteString(mod(elems[0]))
+	for _, s := range elems[1:] {
+		b.WriteString(sep)
+		b.WriteString(mod(s))
 	}
-
-	return statusMessages
+	return b.String()
 }
 
-/*
-var deviceStateDescriptions map[string]string = map[string]string{
-	"0":   "Inga Fel",
-	"4":   "Låg Batterinivå",
-	"8":   "Permanent Fel",
-	"12" : "Permanent Fel Låg Betterinivå",
-	"16":  "Temporärt Fel Tomt Rör",
-	"18":  "Låg Betterinivå Permanent Fel",
-	"20":  "Tomt Rör och Temporärt Fel Låg Batterinivå",
-	"24":  "Permanent Fel och Temporärt Fel Tomt Rör",
-	"34":  "Permanent Fel Låg Batterinivå och Temporärt Fel Tomt Rör",
-	"48":  "Temporärt Fel Läckage",
-	"52":  "Läckage och Temporärt Fel Låg Batterinivå",
-	"56":  "Permanent Fel och Temporärt Fel Läckage",
-	"66":  "Permanent Fel Låg Batterinivå och Temporärt Fel Läckage",
-	"112": "Temporärt Fel Backflöde",
-	"116": "Backflöde och Temporärt Fel Låg Batterinivå",
-	"120": "Permanent Fel och Temporärt Fel Backflöde",
-	"130": "Permanent Fel Låg Batterinivå och Temporärt Fel Backflöde",
-	"144": "Temporärt Fel Is eller Frys Varning",
-	"148": "Is eller Frys Varning och Temporärt Fel Låg Batterinivå",
-	"152": "Permanent Fel och Temporärt Fel Is eller Frys Varning",
-	"156": "Permanent Fel Låg Batterinivå och Temporärt Fel Is eller Frys Varning",
-	"176": "Temporärt Fel Spricka eller Öppet Rör",
-	"180": "Spricka eller Öppet RÖr och Temporärt Fel Låg Batterinivå",
-	"184": "Permanent Fel och Temporärt Fel Spricka eller Öppet Rör",
-	"188": "Permanent Fel Låg Batterinivå och Temporärt Fel Spricka eller Öppet Rör",
+func translate(s string) string {
+	switch s {
+	case "No error":
+		return "Inga fel"
+	case "Power low":
+		return "Låg batterinivå"
+	case "Permanent error":
+		return "Permanent fel"
+	case "Temporary error":
+		return "Temporärt fel"
+	case "Empty spool":
+		return "Tomt rör"
+	case "Leak":
+		return "Läckage"
+	case "Burst":
+		return "Spricka"
+	case "Backflow":
+		return "Backflöde"
+	case "Freeze":
+		return "Is eller Frys Varning"
+	case "Unknown":
+		return "Okänt fel"
+	}
+	return s
 }
-*/
