@@ -7,7 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/diwise/integration-incident/internal/pkg/application"	
+	"github.com/diwise/integration-incident/internal/pkg/application"
+	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/matryer/is"
 )
 
@@ -94,9 +95,9 @@ func createStatusBodyWithValue(deviceId, value string) string {
 
 func mockApp() *application.IntegrationIncidentMock {
 	return &application.IntegrationIncidentMock{
-		DeviceStateUpdatedFunc: func(deviceId, deviceState string) error {
+		DeviceStateUpdatedFunc: func(deviceId string, statusMessage models.StatusMessage) error {
 			return nil
-		},
+		} ,
 		LifebuoyValueUpdatedFunc: func(deviceId, deviceValue string) error {
 			return nil
 		},
@@ -124,12 +125,12 @@ const withDeviceStateJsonFormat string = `{
 		{
 			"id": "urn:ngsi-ld:Device:%s",
 			"type": "Device",
-			"rssi": 0.1,	
-			"snr": 0.41,			
+			"rssi": 0.1,
+			"snr": 0.41,
 			"deviceState": {
 				"type": "Property",
 				"value": "%s"
-			}			
+			}
 		}
 	]
 }`
@@ -140,12 +141,11 @@ const withValueJsonFormat string = `{
 			"id": "urn:ngsi-ld:Lifebuoy:%s",
 			"type": "Lifebuoy",
 			"rssi": 0.1,
-			"snr":  0.41,		
+			"snr":  0.41,
 			"status": {
 				"type": "Property",
 				"value": "%s"
-			}					
+			}
 		}
 	]
 }`
-

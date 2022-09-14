@@ -2,16 +2,32 @@ package application
 
 import (
 	"testing"
+	"time"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/matryer/is"
 	"github.com/rs/zerolog/log"
 )
 
+func status(deviceID string, code int, messages ...string) models.StatusMessage {
+	return models.StatusMessage{
+		DeviceID:  deviceID,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Status: struct {
+			Code     int      "json:\"statusCode\""
+			Messages []string "json:\"statusMessages,omitempty\""
+		}{
+			Code:     code,
+			Messages: messages,
+		},
+		Error: nil,
+	}
+}
+
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", "0")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, "No error"))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -19,11 +35,11 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testin
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 
-	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -31,12 +47,11 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *test
 func TestThatDeviceStateUpdatedDoesNotSendIncidentWhenUpdatedStateIsNoError(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", "1")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 
-	const stateNoError string = "0"
-	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", stateNoError)
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 0, "No error"))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -44,26 +59,26 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentWhenUpdatedStateIsNoError(t *t
 func TestThatDeviceStateUpdatedSendsIncidentReportOnStateChanged(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", "0")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 0))
 	is.NoErr(err)
 
-	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", "4")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 4, "Power low"))
 	is.NoErr(err)
 	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId3 - Låg Batterinivå")
+	is.Equal(incRep.incidents[0].Description, "devId3 - Låg batterinivå")
 	is.Equal(incRep.incidents[0].Category, 17)
 }
 
 func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", "0")
+	err := app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 0))
 	is.NoErr(err)
 
-	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", "3")
+	err = app.DeviceStateUpdated("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 3, "Unknown"))
 	is.NoErr(err)
 	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt Fel: 3")
+	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt fel")
 	is.Equal(incRep.incidents[0].Category, 17)
 }
 
