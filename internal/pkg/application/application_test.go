@@ -11,16 +11,11 @@ import (
 
 func status(deviceID string, code int, messages ...string) models.StatusMessage {
 	return models.StatusMessage{
-		DeviceID:  deviceID,
-		Timestamp: time.Now().Format(time.RFC3339),
-		Status: struct {
-			Code     int      "json:\"statusCode\""
-			Messages []string "json:\"statusMessages,omitempty\""
-		}{
-			Code:     code,
-			Messages: messages,
-		},
-		Error: nil,
+		DeviceID:     deviceID,
+		Timestamp:    time.Now().Format(time.RFC3339),
+		BatteryLevel: 100,
+		Messages:     messages,
+		Status:       code,
 	}
 }
 
