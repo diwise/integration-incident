@@ -6,22 +6,16 @@ type DeviceStatus struct {
 }
 
 type StatusMessage struct {
-	DeviceID  string  `json:"deviceID"`
-	Error     *string `json:"error,omitempty"`
-	Status    Status  `json:"status"`
-	Timestamp string  `json:"timestamp"`
-}
-
-type Status struct {
-	Code     int      `json:"statusCode"`
-	Messages []string `json:"statusMessages,omitempty"`
+	DeviceID     string   `json:"deviceID"`
+	BatteryLevel int      `json:"batteryLevel"`
+	Status       int      `json:"statusCode"`
+	Messages     []string `json:"statusMessages"`
+	Timestamp    string   `json:"timestamp"`
 }
 
 func NewStatusMessage(deviceID string, code int) StatusMessage {
 	return StatusMessage{
 		DeviceID: deviceID,
-		Status: Status{
-			Code: code,
-		},
+		Status: code,
 	}
 }

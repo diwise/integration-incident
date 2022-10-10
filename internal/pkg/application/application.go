@@ -49,7 +49,7 @@ func (a *app) DeviceStateUpdated(deviceId string, sm models.StatusMessage) error
 	}
 
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
-	deviceState := strconv.Itoa(sm.Status.Code)
+	deviceState := strconv.Itoa(sm.Status)
 
 	if !a.checkIfDeviceStateHasChanged(shortId, deviceState) {
 		return nil
@@ -153,7 +153,7 @@ func (a *app) checkIfDeviceValueHasChanged(deviceId, value string) bool {
 }
 
 func translateJoin(deviceID string, sm models.StatusMessage) string {
-	return fmt.Sprintf("%s - %s", deviceID, Join(sm.Status.Messages, " ", translate))
+	return fmt.Sprintf("%s - %s", deviceID, Join(sm.Messages, " ", translate))
 }
 
 func Join(elems []string, sep string, mod func(string) string) string {
