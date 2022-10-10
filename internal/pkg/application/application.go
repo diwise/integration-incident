@@ -49,6 +49,7 @@ func (a *app) DeviceStateUpdated(deviceId string, sm models.StatusMessage) error
 	}
 
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
+
 	deviceState := strconv.Itoa(sm.Status)
 
 	if !a.checkIfDeviceStateHasChanged(shortId, deviceState) {
