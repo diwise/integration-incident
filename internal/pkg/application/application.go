@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/diwise"
@@ -25,6 +26,7 @@ type app struct {
 	incidentReporter func(context.Context, models.Incident) error
 	baseUrl          string
 	port             string
+	stateMutex       sync.Mutex
 	previousStates   map[string]string
 	previousValues   map[string]string
 }
@@ -52,6 +54,9 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
 
 	deviceState := strconv.Itoa(sm.Status)
+
+	a.stateMutex.Lock()
+	defer a.stateMutex.Unlock()
 
 	if !a.checkIfDeviceStateHasChanged(shortId, deviceState) {
 		return nil
@@ -81,6 +86,10 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 	}
 
 	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
+
+	a.stateMutex.Lock()
+	defer a.stateMutex.Unlock()
+
 	valueChanged := a.checkIfDeviceValueHasChanged(shortId, deviceValue)
 
 	if !valueChanged {
