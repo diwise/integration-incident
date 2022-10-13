@@ -1,39 +1,41 @@
 package main
 
 import (
+	"context"
 	"os"
-	"strings"
 
 	"github.com/diwise/integration-incident/internal/pkg/application"
 	"github.com/diwise/integration-incident/internal/pkg/presentation"
 	"github.com/diwise/integration-incident/pkg/incident"
-	"github.com/rs/zerolog/log"
+	"github.com/diwise/service-chassis/pkg/infrastructure/buildinfo"
+	"github.com/diwise/service-chassis/pkg/infrastructure/env"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
 )
 
-func main() {
-	serviceName := "integration-incident"
+const serviceName string = "integration-incident"
 
-	log := log.With().Str("service", strings.ToLower(serviceName)).Logger()
-	log.Info().Msg("starting up ...")
+func main() {
+
+	serviceVersion := buildinfo.SourceVersion()
+	ctx, logger, cleanup := o11y.Init(context.Background(), serviceName, serviceVersion)
+	defer cleanup()
 
 	baseUrl := os.Getenv("DIWISE_BASE_URL")
-	gatewayUrl := os.Getenv("GATEWAY_URL")
-	authCode := os.Getenv("AUTH_CODE")
-	port := os.Getenv("SERVICE_PORT")
-	if port == "" {
-		port = "8080"
+
+	gatewayUrl := env.GetVariableOrDie(logger, "GATEWAY_URL", "valid gateway URL")
+	authCode := env.GetVariableOrDie(logger, "AUTH_CODE", "valid auth code")
+	port := env.GetVariableOrDefault(logger, "SERVICE_PORT", "8080")
+
+	incidentReporter, err := incident.NewIncidentReporter(ctx, gatewayUrl, authCode)
+	if err != nil {
+		logger.Fatal().Err(err).Msg("failed to create incident reporter")
 	}
 
-	incidentReporter, err := incident.NewIncidentReporter(log, gatewayUrl, authCode)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to create incident reporter")
-	}
+	app := application.NewApplication(ctx, incidentReporter, baseUrl, port)
 
-	app := application.NewApplication(log, incidentReporter, baseUrl, port)
-
-	err = presentation.CreateRouterAndStartServing(log, app, port)
+	err = presentation.CreateRouterAndStartServing(ctx, app, port)
 	if err != nil {
-		log.Fatal().Err(err).Msg("failed to start router")
+		logger.Fatal().Err(err).Msg("failed to start router")
 	}
 
 }

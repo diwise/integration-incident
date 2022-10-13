@@ -1,20 +1,20 @@
 package incident
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
-	"github.com/rs/zerolog/log"
 )
 
 func TestPostLifebuouyIncident(t *testing.T) {
 
 	server := setupMockService(http.StatusOK, accessTokenResp)
 
-	incidentReporter, _ := NewIncidentReporter(log.Logger, server.URL, "")
+	incidentReporter, _ := NewIncidentReporter(context.Background(), server.URL, "")
 
 	incident := models.Incident{
 		PersonId:       "deviceID",
@@ -23,7 +23,7 @@ func TestPostLifebuouyIncident(t *testing.T) {
 		MapCoordinates: "62.0,17.0",
 	}
 
-	err := incidentReporter(incident)
+	err := incidentReporter(context.Background(), incident)
 	if err != nil {
 		t.Errorf("could not post incident: %s", err.Error())
 	}

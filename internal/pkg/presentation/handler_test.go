@@ -2,6 +2,7 @@ package presentation
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +11,7 @@ import (
 	"github.com/diwise/integration-incident/internal/pkg/application"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/matryer/is"
+	"github.com/rs/zerolog"
 )
 
 func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
@@ -19,7 +21,7 @@ func TestNotificationHandlerDoesNothingIfDeviceStateDoesNotExist(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(noDeviceState)))
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 
 	is.Equal(len(app.DeviceStateUpdatedCalls()), 0)
@@ -32,7 +34,7 @@ func TestNotificationHandlerTriggersDeviceStateUpdatedIfDeviceStateExists(t *tes
 	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBody("se:servanet:lora:msva:123", "104"))))
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 
 	is.Equal(len(app.DeviceStateUpdatedCalls()), 1)
@@ -45,7 +47,7 @@ func TestNotificationHandlerDoesNotTriggersDeviceStateUpdatedIfWrongDeviceID(t *
 	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBody("notawatermeter", "104"))))
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 
 	is.Equal(len(app.DeviceStateUpdatedCalls()), 0)
@@ -58,7 +60,7 @@ func TestNotificationHandlerReturnsBadRequestIfEmptyRequestBody(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/notify", nil)
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusBadRequest)
 }
 
@@ -69,7 +71,7 @@ func TestNotificationHandlerReturnsBadRequestIfRequestBodyCannotBeUnmarshalledTo
 	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(badRequestJson)))
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusBadRequest)
 }
 
@@ -80,7 +82,7 @@ func TestNotificationHandlerHandlesUpdatedValueForLifeBuoys(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/notify", bytes.NewBuffer([]byte(createStatusBodyWithValue("sn-elt-livboj-01", "on"))))
 	w := httptest.NewRecorder()
 
-	notificationHandler(app).ServeHTTP(w, r)
+	notificationHandler(zerolog.Logger{}, app).ServeHTTP(w, r)
 	is.Equal(w.Code, http.StatusOK)
 	is.Equal(len(app.LifebuoyValueUpdatedCalls()), 1)
 }
@@ -95,10 +97,10 @@ func createStatusBodyWithValue(deviceId, value string) string {
 
 func mockApp() *application.IntegrationIncidentMock {
 	return &application.IntegrationIncidentMock{
-		DeviceStateUpdatedFunc: func(deviceId string, statusMessage models.StatusMessage) error {
+		DeviceStateUpdatedFunc: func(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error {
 			return nil
-		} ,
-		LifebuoyValueUpdatedFunc: func(deviceId, deviceValue string) error {
+		},
+		LifebuoyValueUpdatedFunc: func(ctx context.Context, deviceId, deviceValue string) error {
 			return nil
 		},
 	}

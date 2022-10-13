@@ -1,21 +1,38 @@
 package incident
 
 import (
+	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/rs/zerolog"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
 )
 
-func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResponse, error) {
+var tracer = otel.Tracer("integration-incident/token")
+
+func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenResponse, error) {
+	var err error
+	ctx, span := tracer.Start(ctx, "token-refresh")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
 	params := url.Values{}
 	params.Add("grant_type", `client_credentials`)
 	body := strings.NewReader(params.Encode())
 
-	req, err := http.NewRequest("POST", gatewayUrl+"/token", body)
+	httpClient := http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
+
+	log := logging.GetFromContext(ctx)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl+"/token", body)
 	if err != nil {
 		log.Err(err).Msg("failed to create post request")
 		return nil, err
@@ -24,22 +41,25 @@ func getAccessToken(log zerolog.Logger, gatewayUrl, authCode string) (*tokenResp
 	req.Header.Set("Authorization", authCode)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		log.Err(err).Msg("failed to create get request")
+		log.Err(err).Msg("request failed")
 		return nil, err
 	}
-	if resp.StatusCode != http.StatusOK {
-		log.Info().Msgf("invalid response: %d", resp.StatusCode)
-	}
-
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		log.Err(err).Msg("failed to read response body")
-		return nil, err
-	}
-
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("invalid response %d from token endpoint", resp.StatusCode)
+		log.Error().Err(err).Msgf("bad response")
+		return nil, err
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		err = fmt.Errorf("failed to read response body (%w)", err)
+		log.Err(err).Msg("i/o error")
+		return nil, err
+	}
 
 	token := tokenResponse{}
 
