@@ -16,11 +16,11 @@ func getLifebuoyFromContextBroker(log zerolog.Logger, host, deviceId string) (*d
 	if err != nil {
 		return nil, err
 	}
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request failed: %d", response.StatusCode)
-	}
-
 	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request failed: %d != %d", response.StatusCode, http.StatusOK)
+	}
 
 	lifebuoy := &diwise.Lifebuoy{}
 

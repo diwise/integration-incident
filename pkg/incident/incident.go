@@ -2,6 +2,7 @@ package incident
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,70 +10,88 @@ import (
 	"net/http"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
-	"github.com/rs/zerolog"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 var errNotAuthorized = errors.New("invalid auth code or token refresh required")
 
-func NewIncidentReporter(log zerolog.Logger, gatewayUrl, authCode string) (func(models.Incident) error, error) {
-	token, err := getAccessToken(log, gatewayUrl, authCode)
+func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (func(context.Context, models.Incident) error, error) {
+	token, err := getAccessToken(ctx, gatewayUrl, authCode)
 	if err != nil {
 		return nil, err
 	}
-	return func(incident models.Incident) error {
-		err := postIncident(log, incident, gatewayUrl, token.AccessToken)
+
+	return func(ctx context.Context, incident models.Incident) error {
+		err := postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		if err == errNotAuthorized {
+			log := logging.GetFromContext(ctx)
 			log.Err(err).Msg("post incident failed, retrying with refreshed access token")
-			token, _ = getAccessToken(log, gatewayUrl, authCode)
-			return postIncident(log, incident, gatewayUrl, token.AccessToken)
+			token, _ = getAccessToken(ctx, gatewayUrl, authCode)
+			return postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		}
 		return err
 	}, nil
 }
 
-func postIncident(log zerolog.Logger, incident models.Incident, gatewayUrl, token string) error {
+func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, token string) error {
+	var err error
+	ctx, span := tracer.Start(ctx, "post-incident")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
 	incidentBytes, err := json.Marshal(incident)
 	if err != nil {
-		return fmt.Errorf("could not marshal incident message into json: %s", err.Error())
+		err = fmt.Errorf("could not marshal incident message into json: %w", err)
+		return err
 	}
 
 	gatewayUrl = gatewayUrl + "/incident/1.0/api/sendincident"
 
+	log := logging.GetFromContext(ctx)
 	log.Info().Msgf("posting incident \"%s\" (cat: %d) to: %s", incident.Description, incident.Category, gatewayUrl)
 
-	client := http.Client{}
+	httpClient := http.Client{
+		Transport: otelhttp.NewTransport(http.DefaultTransport),
+	}
 
-	req, _ := http.NewRequest("POST", gatewayUrl, bytes.NewBuffer(incidentBytes))
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl, bytes.NewBuffer(incidentBytes))
 	req.Header.Add("Authorization", "Bearer "+token)
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to post incident message: %s", err.Error())
+		err = fmt.Errorf("failed to post incident message: %w", err)
+		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return errNotAuthorized
+		err = errNotAuthorized
+		return err
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad response code from backend: %d", resp.StatusCode)
+		err = fmt.Errorf("bad response code from backend: %d", resp.StatusCode)
+		return err
 	}
 
 	responseBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read response body: %s", err.Error())
+		err = fmt.Errorf("failed to read response body: %w", err)
+		return err
 	}
 
 	response := incidentResponse{}
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal incident response: %s", err.Error())
+		err = fmt.Errorf("failed to unmarshal incident response: %w", err)
+		return err
 	}
 
 	if response.Status != "OK" {
-		return fmt.Errorf("incident backend returned status \"%s\" with message \"%s\"", response.Status, response.Message)
+		err = fmt.Errorf("incident backend returned status \"%s\" with message \"%s\"", response.Status, response.Message)
+		return err
 	}
 
 	log.Info().Msgf("incident created with ID: %s", response.IncidentID)

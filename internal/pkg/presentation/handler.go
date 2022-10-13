@@ -4,7 +4,8 @@ import (
 	"compress/flate"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,15 +15,23 @@ import (
 	"github.com/diwise/integration-incident/internal/pkg/application"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/integration-incident/internal/pkg/presentation/api"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
 )
 
-func CreateRouterAndStartServing(log zerolog.Logger, app application.IntegrationIncident, servicePort string) error {
+var tracer = otel.Tracer("integration-incident/handlers")
+
+func CreateRouterAndStartServing(ctx context.Context, app application.IntegrationIncident, servicePort string) error {
 	r := chi.NewRouter()
+
+	log := logging.GetFromContext(ctx)
 
 	r.Use(cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -33,18 +42,19 @@ func CreateRouterAndStartServing(log zerolog.Logger, app application.Integration
 	compressor := middleware.NewCompressor(flate.DefaultCompression, "application/json", "application/ld+json")
 	r.Use(compressor.Handler)
 	r.Use(middleware.Logger)
+	r.Use(otelchi.Middleware("integration-incident", otelchi.WithChiRoutes(r)))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	r.Post("/api/notify", notificationHandler(app))
+	r.Post("/api/notify", notificationHandler(log, app))
 
 	p, err := cloudevents.NewHTTP()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to create protocol: %s", err.Error())
 	}
 
-	h, err := cloudevents.NewHTTPReceiveHandler(context.Background(), p, receive(app))
+	h, err := cloudevents.NewHTTPReceiveHandler(context.Background(), p, receive(log, app))
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to create handler: %s", err.Error())
 	}
@@ -67,41 +77,65 @@ func cloudeventReceiveHandler(h *client.EventReceiver) http.HandlerFunc {
 	})
 }
 
-func receive(app application.IntegrationIncident) func(context.Context, cloudevents.Event) {
+func receive(logger zerolog.Logger, app application.IntegrationIncident) func(context.Context, cloudevents.Event) {
 	return func(ctx context.Context, event cloudevents.Event) {
+		var err error
+
+		ctx, span := tracer.Start(ctx, "handle-cloudevent")
+		defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
+
+		log.Info().Msgf("received cloud event of type %s", event.Type())
+
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
 			statusMessage := models.StatusMessage{}
 
-			json.Unmarshal(event.Data(), &statusMessage)
+			err = json.Unmarshal(event.Data(), &statusMessage)
+			if err != nil {
+				err = fmt.Errorf("failed to unmarshal event: %w", err)
+				return
+			}
 
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
-				app.DeviceStateUpdated(statusMessage.DeviceID, statusMessage)
+				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 			}
 		}
+
+		log.Info().Msg("done handling event")
 	}
 }
 
-func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
+func notificationHandler(logger zerolog.Logger, app application.IntegrationIncident) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
+
+		ctx, span := tracer.Start(r.Context(), "handle-notification")
+		defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
+
 		notif := api.Notification{}
 
-		bodyBytes, err := ioutil.ReadAll(r.Body)
+		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
-			log.Err(err).Msg("failed to read request body")
+			err = fmt.Errorf("failed to read request body (%w)", err)
+			log.Err(err).Msg("i/o error")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		err = json.Unmarshal(bodyBytes, &notif)
 		if err != nil {
-			log.Err(err).Msg("failed to unmarshal request body")
+			err = fmt.Errorf("failed to unmarshal request body (%w)", err)
+			log.Err(err).Msg("bad request")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if notif.SubscriptionId == "" {
-			log.Err(err).Msg("request body is not a valid notification")
+			err = fmt.Errorf("request body is not a valid notification")
+			log.Err(err).Msg("bad request")
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -113,11 +147,11 @@ func notificationHandler(app application.IntegrationIncident) http.HandlerFunc {
 					code, _ := strconv.Atoi(n.DeviceState.Value)
 					s := models.NewStatusMessage(n.Id, code)
 					// TODO: remove code block?
-					app.DeviceStateUpdated(n.Id, s)
+					err = app.DeviceStateUpdated(ctx, n.Id, s)
 				}
 			case "Lifebuoy":
 				if n.Status != nil {
-					app.LifebuoyValueUpdated(n.Id, n.Status.Value)
+					err = app.LifebuoyValueUpdated(ctx, n.Id, n.Status.Value)
 				}
 			}
 		}
