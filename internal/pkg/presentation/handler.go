@@ -84,9 +84,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 		ctx, span := tracer.Start(ctx, "handle-cloudevent")
 		defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
-		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
-
-		log.Info().Msgf("received cloud event of type %s", event.Type())
+		_, ctx, _ = o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
 			statusMessage := models.StatusMessage{}
@@ -101,8 +99,6 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 			}
 		}
-
-		log.Info().Msg("done handling event")
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
@@ -27,8 +27,12 @@ func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (func
 		err := postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		if err == errNotAuthorized {
 			log := logging.GetFromContext(ctx)
-			log.Err(err).Msg("post incident failed, retrying with refreshed access token")
-			token, _ = getAccessToken(ctx, gatewayUrl, authCode)
+			log.Error().Err(err).Msg("post incident failed, retrying after access token refresh")
+			token, err = getAccessToken(ctx, gatewayUrl, authCode)
+			if err != nil {
+				err = fmt.Errorf("failed to refresh access token: %w", err)
+				return err
+			}
 			return postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		}
 		return err
@@ -76,7 +80,7 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	responseBody, err := ioutil.ReadAll(resp.Body)
+	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read response body: %w", err)
 		return err
