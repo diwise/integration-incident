@@ -34,7 +34,8 @@ func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenRes
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl+"/token", body)
 	if err != nil {
-		log.Err(err).Msg("failed to create post request")
+		err = fmt.Errorf("failed to create post request: %w", err)
+		log.Err(err).Msg("request error")
 		return nil, err
 	}
 
@@ -68,6 +69,8 @@ func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenRes
 		log.Err(err).Msg("failed to unmarshal access token json")
 		return nil, err
 	}
+
+	log.Info().Msg("refreshed access token")
 
 	return &token, nil
 }
