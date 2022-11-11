@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/diwise/integration-incident/internal/pkg/application/services"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/matryer/is"
 )
@@ -105,7 +106,13 @@ func TestThatDeviceValueUpdatedSendsIncidentReportOnValueChanged(t *testing.T) {
 func testSetup(t *testing.T) (*is.I, *incidentReporter, IntegrationIncident) {
 	is := is.New(t)
 	incRep := newIncidentReporterThatReturns(nil)
-	app := NewApplication(context.Background(), incRep.f, "", "")
+	locator := &services.EntityLocatorMock{
+		LocateFunc: func(ctx context.Context, entityType, entityID string) (float64, float64, error) {
+			return 62.388178, 17.315090, nil
+		},
+	}
+
+	app := NewApplication(context.Background(), incRep.f, locator)
 
 	return is, incRep, app
 }

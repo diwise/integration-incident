@@ -17,7 +17,9 @@ import (
 
 var errNotAuthorized = errors.New("invalid auth code or token refresh required")
 
-func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (func(context.Context, models.Incident) error, error) {
+type ReporterFunc func(context.Context, models.Incident) error
+
+func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (ReporterFunc, error) {
 	token, err := getAccessToken(ctx, gatewayUrl, authCode)
 	if err != nil {
 		return nil, err

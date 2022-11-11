@@ -7,9 +7,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/diwise/integration-incident/internal/pkg/application/services"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
+	"github.com/diwise/integration-incident/pkg/incident"
 	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/diwise"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
+	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
+	"go.opentelemetry.io/otel"
 )
 
 //go:generate moq -rm -out application_mock.go . IntegrationIncident
@@ -19,21 +24,21 @@ type IntegrationIncident interface {
 	LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error
 }
 
+var tracer = otel.Tracer("integration-incident/app")
+
 type app struct {
-	incidentReporter func(context.Context, models.Incident) error
-	baseUrl          string
-	port             string
+	incidentReporter incident.ReporterFunc
+	entityLocator    services.EntityLocator
 	stateMutex       sync.Mutex
 	previousStates   map[string]string
 	previousValues   map[string]string
 }
 
-func NewApplication(ctx context.Context, incidentReporter func(context.Context, models.Incident) error, baseUrl, port string) IntegrationIncident {
+func NewApplication(ctx context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
 
 	newApp := &app{
 		incidentReporter: incidentReporter,
-		baseUrl:          baseUrl,
-		port:             port,
+		entityLocator:    entityLocator,
 		previousStates:   make(map[string]string),
 		previousValues:   make(map[string]string),
 	}
@@ -79,8 +84,17 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 }
 
 func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error {
+	var err error
+
+	ctx, span := tracer.Start(ctx, "lifebuoy-updated")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+	log := logging.GetFromContext(ctx)
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
+
 	if !strings.HasPrefix(deviceId, diwise.LifebuoyIDPrefix) {
-		return fmt.Errorf("device with id %s is not supported", deviceId)
+		err = fmt.Errorf("device with id %s is not supported", deviceId)
+		return err
 	}
 
 	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
@@ -94,19 +108,15 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 		return nil
 	}
 
-	log := logging.GetFromContext(ctx)
-
 	if deviceValue == "off" {
 		log.Info().Msgf("state changed to \"off\" on device: %s", shortId)
 
 		const lifebuoyCategory int = 15
 		incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
 
-		lifebuoy, err := getLifebuoyFromContextBroker(log, a.baseUrl, deviceId)
-
+		latitude, longitude, err := a.entityLocator.Locate(ctx, diwise.LifebuoyTypeName, deviceId)
 		if err == nil {
-			point := lifebuoy.Location.GetAsPoint()
-			incident = incident.AtLocation(point.Latitude(), point.Longitude())
+			incident = incident.AtLocation(latitude, longitude)
 		}
 
 		err = a.incidentReporter(ctx, *incident)
