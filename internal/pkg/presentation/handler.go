@@ -1,7 +1,6 @@
 package presentation
 
 import (
-	"compress/flate"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +18,6 @@ import (
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
@@ -39,9 +37,6 @@ func CreateRouterAndStartServing(ctx context.Context, app application.Integratio
 		Debug:            false,
 	}).Handler)
 
-	compressor := middleware.NewCompressor(flate.DefaultCompression, "application/json", "application/ld+json")
-	r.Use(compressor.Handler)
-	r.Use(middleware.Logger)
 	r.Use(otelchi.Middleware("integration-incident", otelchi.WithChiRoutes(r)))
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
