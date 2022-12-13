@@ -20,6 +20,19 @@ func status(deviceID string, code int, messages ...string) models.StatusMessage 
 	}
 }
 
+func TestThatDeviceStateUpdatedDoesNotSendIncidentIfStatusIsNoErrOrPayloadErr(t *testing.T) {
+	is, incRep, app := testSetup(t)
+
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, "No error"))
+	is.NoErr(err)
+	incRep.assertNotCalled(is)
+
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 100, "Payload error"))
+	is.NoErr(err)
+	incRep.assertNotCalled(is)
+
+}
+
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
