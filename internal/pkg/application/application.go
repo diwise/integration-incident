@@ -65,8 +65,9 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 	}
 
 	const stateNoError string = "0"
+	const payloadError string = "100"
 
-	if deviceState != stateNoError {
+	if deviceState != stateNoError && deviceState != payloadError {
 		const watermeterCategory int = 17
 		incident := models.NewIncident(watermeterCategory, translateJoin(shortId, sm)).AtLocation(62.388178, 17.315090)
 
