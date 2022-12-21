@@ -79,7 +79,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 		ctx, span := tracer.Start(ctx, "handle-cloudevent")
 		defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
-		_, ctx, _ = o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
+		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
 			statusMessage := models.StatusMessage{}
@@ -91,6 +91,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 			}
 
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
+				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device", statusMessage.DeviceID).Logger())
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 			}
 		}
