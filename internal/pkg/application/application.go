@@ -52,9 +52,20 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return fmt.Errorf("device with id %s is not supported", deviceId)
 	}
 
+	log := logging.GetFromContext(ctx)
+
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
 
+	const (
+		StateNoError string = "0"
+		PayloadError string = "100"
+	)
+
 	deviceState := strconv.Itoa(sm.Status)
+	if deviceState == PayloadError {
+		log.Warn().Msg("ignoring payload error")
+		return nil
+	}
 
 	a.stateMutex.Lock()
 	defer a.stateMutex.Unlock()
@@ -64,16 +75,14 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return nil
 	}
 
-	const stateNoError string = "0"
-	const payloadError string = "100"
+	log.Info().Msgf("device state changed to %s", deviceState)
 
-	if deviceState != stateNoError && deviceState != payloadError {
+	if deviceState != StateNoError {
 		const watermeterCategory int = 17
 		incident := models.NewIncident(watermeterCategory, translateJoin(shortId, sm)).AtLocation(62.388178, 17.315090)
 
 		err := a.incidentReporter(ctx, *incident)
 		if err != nil {
-			log := logging.GetFromContext(ctx)
 			log.Error().Err(err).Msg("could not post incident")
 			return err
 		}
