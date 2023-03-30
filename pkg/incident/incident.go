@@ -30,11 +30,14 @@ func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (Repo
 		if err == errNotAuthorized {
 			log := logging.GetFromContext(ctx)
 			log.Error().Err(err).Msg("post incident failed, retrying after access token refresh")
-			token, err = getAccessToken(ctx, gatewayUrl, authCode)
+
+			newToken, err := getAccessToken(ctx, gatewayUrl, authCode)
 			if err != nil {
 				err = fmt.Errorf("failed to refresh access token: %w", err)
 				return err
 			}
+
+			token = newToken
 			return postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		}
 		return err
