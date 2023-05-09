@@ -81,7 +81,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 
 		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
-		log.Debug().Str("event_type", event.Type()).Str("body", string(event.Data())).Msg("received cloud event")
+		log.Debug().Str("event_type", event.Type()).Msg("received cloud event")
 
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
 			statusMessage := models.StatusMessage{}
