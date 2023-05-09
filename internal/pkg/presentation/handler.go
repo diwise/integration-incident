@@ -81,6 +81,8 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 
 		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
+		log.Debug().Str("event_type", event.Type()).Msg("received cloud event")
+
 		if strings.EqualFold(event.Type(), "diwise.statusmessage") {
 			statusMessage := models.StatusMessage{}
 
@@ -94,6 +96,8 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device", statusMessage.DeviceID).Logger())
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 			}
+		} else {
+			log.Warn().Str("event_type", event.Type()).Msg("ignoring unknown type")
 		}
 	}
 }
