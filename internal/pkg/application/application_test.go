@@ -16,7 +16,7 @@ func status(deviceID string, code int, messages ...string) models.StatusMessage 
 		Timestamp:    time.Now().Format(time.RFC3339),
 		BatteryLevel: 100,
 		Messages:     messages,
-		Status:       code,
+		Code:       code,
 	}
 }
 

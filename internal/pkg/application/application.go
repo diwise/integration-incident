@@ -61,7 +61,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		PayloadError string = "100"
 	)
 
-	deviceState := strconv.Itoa(sm.Status)
+	deviceState := strconv.Itoa(sm.Code)
 	if deviceState == PayloadError {
 		log.Warn().Msg("ignoring payload error")
 		return nil
