@@ -49,7 +49,8 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 	ctx, span := tracer.Start(ctx, "post-incident")
 	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
-	incidentBytes, err := json.Marshal(incident)
+	var incidentBytes []byte
+	incidentBytes, err = json.Marshal(incident)
 	if err != nil {
 		err = fmt.Errorf("could not marshal incident message into json: %w", err)
 		return err
@@ -85,7 +86,8 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	responseBody, err := io.ReadAll(resp.Body)
+	var responseBody []byte
+	responseBody, err = io.ReadAll(resp.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read response body: %w", err)
 		return err
