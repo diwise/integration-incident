@@ -47,12 +47,18 @@ func NewApplication(ctx context.Context, incidentReporter incident.ReporterFunc,
 }
 
 func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models.StatusMessage) error {
+	var err error
 
 	if !strings.Contains(deviceId, "se:servanet:lora:msva:") {
 		return fmt.Errorf("device with id %s is not supported", deviceId)
 	}
 
 	log := logging.GetFromContext(ctx)
+
+	ctx, span := tracer.Start(ctx, "device-state-updated")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
 
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
 

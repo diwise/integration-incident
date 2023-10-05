@@ -1,4 +1,4 @@
-FROM golang:1.19 AS builder
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.21 AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
@@ -12,9 +12,11 @@ COPY . .
 
 WORKDIR /app/cmd/integration-incident
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build
+ARG TARGETARCH
+ARG TARGETOS
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build
 
-FROM registry.access.redhat.com/ubi8/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 
 WORKDIR /opt/diwise
 

@@ -93,7 +93,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 			}
 
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
-				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device", statusMessage.DeviceID).Logger())
+				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device_id", statusMessage.DeviceID).Logger())
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 			}
 		} else {
