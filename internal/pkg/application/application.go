@@ -22,6 +22,7 @@ import (
 type IntegrationIncident interface {
 	DeviceStateUpdated(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error
 	LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error
+	SewerOverflow(ctx context.Context, functionUpdated models.FunctionUpdated) error
 }
 
 var tracer = otel.Tracer("integration-incident/app")
@@ -34,7 +35,7 @@ type app struct {
 	previousValues   map[string]string
 }
 
-func NewApplication(ctx context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
+func NewApplication(_ context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
 
 	newApp := &app{
 		incidentReporter: incidentReporter,
@@ -143,6 +144,36 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 	}
 
 	a.updateDeviceValue(shortId, deviceValue)
+
+	return nil
+}
+
+func (a *app) SewerOverflow(ctx context.Context, functionUpdated models.FunctionUpdated) error {
+	var err error
+
+	ctx, span := tracer.Start(ctx, "sewer-overflow-detected")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+	log := logging.GetFromContext(ctx)
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
+
+	if functionUpdated.Stopwatch.State {
+		const SewerOverflowCategory int = 18
+
+		log.Info().Msgf("Sewer overflow detected, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
+
+		incident := models.NewIncident(SewerOverflowCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
+		
+		if functionUpdated.Location != nil {
+			incident = incident.AtLocation(functionUpdated.Location.Latitude, functionUpdated.Location.Longitude)
+		}
+		
+		err = a.incidentReporter(ctx, *incident)
+		if err != nil {
+			log.Err(err).Msg("could not post incident")
+			return err
+		}
+	}
 
 	return nil
 }
