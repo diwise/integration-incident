@@ -27,12 +27,39 @@ type IntegrationIncident interface {
 
 var tracer = otel.Tracer("integration-incident/app")
 
+type cache struct {
+	mx    sync.Mutex
+	items map[string]string
+}
+
+func (c *cache) Add(key, value string) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	c.items[key] = value
+}
+func (c *cache) Equals(key, value string) bool {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	storedValue, ok := c.items[key]
+	if !ok {
+		return false
+	}
+	return storedValue == value
+}
+func (c *cache) ExistsAndIsChanged(key, value string) (bool, bool) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	storedValue, ok := c.items[key]
+	if !ok {
+		return false, false
+	}
+	return true, storedValue != value
+}
+
 type app struct {
 	incidentReporter incident.ReporterFunc
 	entityLocator    services.EntityLocator
-	stateMutex       sync.Mutex
-	previousStates   map[string]string
-	previousValues   map[string]string
+	cache            cache
 }
 
 func NewApplication(_ context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
@@ -40,8 +67,7 @@ func NewApplication(_ context.Context, incidentReporter incident.ReporterFunc, e
 	newApp := &app{
 		incidentReporter: incidentReporter,
 		entityLocator:    entityLocator,
-		previousStates:   make(map[string]string),
-		previousValues:   make(map[string]string),
+		cache:            cache{items: make(map[string]string)},
 	}
 
 	return newApp
@@ -74,10 +100,9 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return nil
 	}
 
-	a.stateMutex.Lock()
-	defer a.stateMutex.Unlock()
+	key := fmt.Sprintf("%s:%s", shortId, "state")
+	exists, changed := a.cache.ExistsAndIsChanged(key, deviceState)
 
-	exists, changed := a.checkIfDeviceStateExistsAndHasChanged(shortId, deviceState)
 	if exists && !changed {
 		return nil
 	}
@@ -95,8 +120,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		}
 	}
 
-	a.updateDeviceState(shortId, deviceState)
-
+	a.cache.Add(key, deviceState)
 	return nil
 }
 
@@ -116,10 +140,8 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 
 	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
 
-	a.stateMutex.Lock()
-	defer a.stateMutex.Unlock()
-
-	exists, changed := a.checkIfDeviceValueExistsAndHasChanged(shortId, deviceValue)
+	key := fmt.Sprintf("%s:%s", shortId, "value")
+	exists, changed := a.cache.ExistsAndIsChanged(key, deviceValue)
 
 	if exists && !changed {
 		return nil
@@ -143,7 +165,7 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 		}
 	}
 
-	a.updateDeviceValue(shortId, deviceValue)
+	a.cache.Add(key, deviceValue)
 
 	return nil
 }
@@ -157,17 +179,23 @@ func (a *app) SewerOverflow(ctx context.Context, functionUpdated models.Function
 	log := logging.GetFromContext(ctx)
 	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
 
+	key := fmt.Sprintf("%s:%s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType)
+
+	if a.cache.Equals(key, strconv.FormatBool(functionUpdated.Stopwatch.State)) {
+		return nil
+	}
+
 	if functionUpdated.Stopwatch.State {
 		const SewerOverflowCategory int = 18
 
 		log.Info().Msgf("Sewer overflow detected, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
 
 		incident := models.NewIncident(SewerOverflowCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
-		
+
 		if functionUpdated.Location != nil {
 			incident = incident.AtLocation(functionUpdated.Location.Latitude, functionUpdated.Location.Longitude)
 		}
-		
+
 		err = a.incidentReporter(ctx, *incident)
 		if err != nil {
 			log.Err(err).Msg("could not post incident")
@@ -175,43 +203,9 @@ func (a *app) SewerOverflow(ctx context.Context, functionUpdated models.Function
 		}
 	}
 
+	a.cache.Add(key, strconv.FormatBool(functionUpdated.Stopwatch.State))
+
 	return nil
-}
-
-func (a *app) updateDeviceState(deviceId, deviceState string) {
-	a.previousStates[deviceId] = deviceState
-}
-
-func (a *app) updateDeviceValue(deviceId, deviceValue string) {
-	a.previousValues[deviceId] = deviceValue
-}
-
-func (a *app) checkIfDeviceStateExistsAndHasChanged(deviceId, state string) (exists, changed bool) {
-	var storedState string
-
-	storedState, exists = a.previousStates[deviceId]
-
-	if !exists {
-		a.previousStates[deviceId] = state
-	} else if storedState != state {
-		changed = true
-	}
-
-	return
-}
-
-func (a *app) checkIfDeviceValueExistsAndHasChanged(deviceId, value string) (exists, changed bool) {
-	var storedValue string
-
-	storedValue, exists = a.previousValues[deviceId]
-
-	if !exists {
-		a.previousValues[deviceId] = value
-	} else if storedValue != value {
-		changed = true
-	}
-
-	return
 }
 
 func translateJoin(deviceID string, sm models.StatusMessage) string {

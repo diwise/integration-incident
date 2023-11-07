@@ -112,7 +112,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 				return 
 			}
 
-			log.Debug().Msgf("function.updated, type")
+			log.Debug().Msgf("function.updated - %s %s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType)
 
 			if functionUpdated.Type == "stopwatch" && functionUpdated.SubType == "overflow" {
 				err = app.SewerOverflow(ctx, functionUpdated)
