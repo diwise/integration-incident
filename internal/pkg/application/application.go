@@ -186,11 +186,11 @@ func (a *app) SewerOverflow(ctx context.Context, functionUpdated models.Function
 	}
 
 	if functionUpdated.Stopwatch.State {
-		const SewerOverflowCategory int = 18
+		const SewageOverflowCategory int = 18
 
-		log.Info().Msgf("Sewer overflow detected, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
+		log.Info().Msgf("SewageOverflow, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
 
-		incident := models.NewIncident(SewerOverflowCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
+		incident := models.NewIncident(SewageOverflowCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
 
 		if functionUpdated.Location != nil {
 			incident = incident.AtLocation(functionUpdated.Location.Latitude, functionUpdated.Location.Longitude)

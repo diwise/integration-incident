@@ -56,7 +56,7 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	gatewayUrl = gatewayUrl + "/incident/1.0/api/sendincident"
+	gatewayUrl = gatewayUrl + "/incident/2.0/incident"
 
 	log := logging.GetFromContext(ctx)
 	log.Info().Msgf("posting incident \"%s\" (cat: %d) to: %s", incident.Description, incident.Category, gatewayUrl)
