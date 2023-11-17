@@ -90,7 +90,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 			statusMessage := models.StatusMessage{}
 
 			err = json.Unmarshal(event.Data(), &statusMessage)
-			if err != nil {			
+			if err != nil {
 				log.Err(err).Msg("failed to unmarshal event")
 				return
 			}
@@ -98,7 +98,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
 				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device_id", statusMessage.DeviceID).Logger())
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
-				if err != nil {			
+				if err != nil {
 					log.Err(err).Msg("device status updated failed")
 					return
 				}
@@ -109,17 +109,17 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 			err = json.Unmarshal(event.Data(), &functionUpdated)
 			if err != nil {
 				log.Err(err).Msg("failed to unmarshal event")
-				return 
+				return
 			}
 
 			log.Debug().Msgf("function.updated - %s %s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType)
 
 			if functionUpdated.Type == "stopwatch" && functionUpdated.SubType == "overflow" {
-				err = app.SewerOverflow(ctx, functionUpdated)
+				err = app.SewageOverflowObserved(ctx, functionUpdated)
 			}
 			if err != nil {
 				log.Err(err).Msg("sewer overflow failed")
-				return 
+				return
 			}
 		default:
 			log.Info().Str("event_type", event.Type()).Msg("ignoring unknown type")
