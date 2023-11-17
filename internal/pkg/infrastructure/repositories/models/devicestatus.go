@@ -17,6 +17,6 @@ type StatusMessage struct {
 func NewStatusMessage(deviceID string, code int) StatusMessage {
 	return StatusMessage{
 		DeviceID: deviceID,
-		Code: code,
+		Code:     code,
 	}
 }

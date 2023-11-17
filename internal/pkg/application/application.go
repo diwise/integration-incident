@@ -22,37 +22,70 @@ import (
 type IntegrationIncident interface {
 	DeviceStateUpdated(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error
 	LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error
+	SewageOverflowObserved(ctx context.Context, functionUpdated models.FunctionUpdated) error
 }
 
 var tracer = otel.Tracer("integration-incident/app")
 
+type cache struct {
+	mx    sync.Mutex
+	items map[string]string
+}
+
+func (c *cache) Add(key, value string) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	c.items[key] = value
+}
+func (c *cache) Equals(key, value string) bool {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	storedValue, ok := c.items[key]
+	if !ok {
+		return false
+	}
+	return storedValue == value
+}
+func (c *cache) ExistsAndIsChanged(key, value string) (bool, bool) {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	storedValue, ok := c.items[key]
+	if !ok {
+		return false, false
+	}
+	return true, storedValue != value
+}
+
 type app struct {
 	incidentReporter incident.ReporterFunc
 	entityLocator    services.EntityLocator
-	stateMutex       sync.Mutex
-	previousStates   map[string]string
-	previousValues   map[string]string
+	cache            cache
 }
 
-func NewApplication(ctx context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
+func NewApplication(_ context.Context, incidentReporter incident.ReporterFunc, entityLocator services.EntityLocator) IntegrationIncident {
 
 	newApp := &app{
 		incidentReporter: incidentReporter,
 		entityLocator:    entityLocator,
-		previousStates:   make(map[string]string),
-		previousValues:   make(map[string]string),
+		cache:            cache{items: make(map[string]string)},
 	}
 
 	return newApp
 }
 
 func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models.StatusMessage) error {
+	var err error
 
 	if !strings.Contains(deviceId, "se:servanet:lora:msva:") {
 		return fmt.Errorf("device with id %s is not supported", deviceId)
 	}
 
 	log := logging.GetFromContext(ctx)
+
+	ctx, span := tracer.Start(ctx, "device-state-updated")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
+
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
 
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
 
@@ -67,10 +100,9 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return nil
 	}
 
-	a.stateMutex.Lock()
-	defer a.stateMutex.Unlock()
+	key := fmt.Sprintf("%s:%s", shortId, "state")
+	exists, changed := a.cache.ExistsAndIsChanged(key, deviceState)
 
-	exists, changed := a.checkIfDeviceStateExistsAndHasChanged(shortId, deviceState)
 	if exists && !changed {
 		return nil
 	}
@@ -88,8 +120,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		}
 	}
 
-	a.updateDeviceState(shortId, deviceState)
-
+	a.cache.Add(key, deviceState)
 	return nil
 }
 
@@ -109,10 +140,8 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 
 	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
 
-	a.stateMutex.Lock()
-	defer a.stateMutex.Unlock()
-
-	exists, changed := a.checkIfDeviceValueExistsAndHasChanged(shortId, deviceValue)
+	key := fmt.Sprintf("%s:%s", shortId, "value")
+	exists, changed := a.cache.ExistsAndIsChanged(key, deviceValue)
 
 	if exists && !changed {
 		return nil
@@ -136,45 +165,47 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 		}
 	}
 
-	a.updateDeviceValue(shortId, deviceValue)
+	a.cache.Add(key, deviceValue)
 
 	return nil
 }
 
-func (a *app) updateDeviceState(deviceId, deviceState string) {
-	a.previousStates[deviceId] = deviceState
-}
+func (a *app) SewageOverflowObserved(ctx context.Context, functionUpdated models.FunctionUpdated) error {
+	var err error
 
-func (a *app) updateDeviceValue(deviceId, deviceValue string) {
-	a.previousValues[deviceId] = deviceValue
-}
+	ctx, span := tracer.Start(ctx, "sewage-overflow-observed")
+	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
-func (a *app) checkIfDeviceStateExistsAndHasChanged(deviceId, state string) (exists, changed bool) {
-	var storedState string
+	log := logging.GetFromContext(ctx)
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
 
-	storedState, exists = a.previousStates[deviceId]
+	key := fmt.Sprintf("%s:%s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType)
 
-	if !exists {
-		a.previousStates[deviceId] = state
-	} else if storedState != state {
-		changed = true
+	if a.cache.Equals(key, strconv.FormatBool(functionUpdated.Stopwatch.State)) {
+		return nil
 	}
 
-	return
-}
+	if functionUpdated.Stopwatch.State {
+		const SewageOverflowObservedCategory int = 18
 
-func (a *app) checkIfDeviceValueExistsAndHasChanged(deviceId, value string) (exists, changed bool) {
-	var storedValue string
+		log.Info().Msgf("SewageOverflowObserved, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
 
-	storedValue, exists = a.previousValues[deviceId]
+		incident := models.NewIncident(SewageOverflowObservedCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
 
-	if !exists {
-		a.previousValues[deviceId] = value
-	} else if storedValue != value {
-		changed = true
+		if functionUpdated.Location != nil {
+			incident = incident.AtLocation(functionUpdated.Location.Latitude, functionUpdated.Location.Longitude)
+		}
+
+		err = a.incidentReporter(ctx, *incident)
+		if err != nil {
+			log.Err(err).Msg("could not post incident")
+			return err
+		}
 	}
 
-	return
+	a.cache.Add(key, strconv.FormatBool(functionUpdated.Stopwatch.State))
+
+	return nil
 }
 
 func translateJoin(deviceID string, sm models.StatusMessage) string {

@@ -14,19 +14,19 @@ var _ EntityLocator = &EntityLocatorMock{}
 
 // EntityLocatorMock is a mock implementation of EntityLocator.
 //
-// 	func TestSomethingThatUsesEntityLocator(t *testing.T) {
+//	func TestSomethingThatUsesEntityLocator(t *testing.T) {
 //
-// 		// make and configure a mocked EntityLocator
-// 		mockedEntityLocator := &EntityLocatorMock{
-// 			LocateFunc: func(ctx context.Context, entityType string, entityID string) (float64, float64, error) {
-// 				panic("mock out the Locate method")
-// 			},
-// 		}
+//		// make and configure a mocked EntityLocator
+//		mockedEntityLocator := &EntityLocatorMock{
+//			LocateFunc: func(ctx context.Context, entityType string, entityID string) (float64, float64, error) {
+//				panic("mock out the Locate method")
+//			},
+//		}
 //
-// 		// use mockedEntityLocator in code that requires EntityLocator
-// 		// and then make assertions.
+//		// use mockedEntityLocator in code that requires EntityLocator
+//		// and then make assertions.
 //
-// 	}
+//	}
 type EntityLocatorMock struct {
 	// LocateFunc mocks the Locate method.
 	LocateFunc func(ctx context.Context, entityType string, entityID string) (float64, float64, error)
@@ -68,7 +68,8 @@ func (mock *EntityLocatorMock) Locate(ctx context.Context, entityType string, en
 
 // LocateCalls gets all the calls that were made to Locate.
 // Check the length with:
-//     len(mockedEntityLocator.LocateCalls())
+//
+//	len(mockedEntityLocator.LocateCalls())
 func (mock *EntityLocatorMock) LocateCalls() []struct {
 	Ctx        context.Context
 	EntityType string

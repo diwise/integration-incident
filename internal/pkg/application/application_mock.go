@@ -15,28 +15,34 @@ var _ IntegrationIncident = &IntegrationIncidentMock{}
 
 // IntegrationIncidentMock is a mock implementation of IntegrationIncident.
 //
-// 	func TestSomethingThatUsesIntegrationIncident(t *testing.T) {
+//	func TestSomethingThatUsesIntegrationIncident(t *testing.T) {
 //
-// 		// make and configure a mocked IntegrationIncident
-// 		mockedIntegrationIncident := &IntegrationIncidentMock{
-// 			DeviceStateUpdatedFunc: func(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error {
-// 				panic("mock out the DeviceStateUpdated method")
-// 			},
-// 			LifebuoyValueUpdatedFunc: func(ctx context.Context, deviceId string, deviceValue string) error {
-// 				panic("mock out the LifebuoyValueUpdated method")
-// 			},
-// 		}
+//		// make and configure a mocked IntegrationIncident
+//		mockedIntegrationIncident := &IntegrationIncidentMock{
+//			DeviceStateUpdatedFunc: func(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error {
+//				panic("mock out the DeviceStateUpdated method")
+//			},
+//			LifebuoyValueUpdatedFunc: func(ctx context.Context, deviceId string, deviceValue string) error {
+//				panic("mock out the LifebuoyValueUpdated method")
+//			},
+//			SewageOverflowObservedFunc: func(ctx context.Context, functionUpdated models.FunctionUpdated) error {
+//				panic("mock out the SewageOverflowObserved method")
+//			},
+//		}
 //
-// 		// use mockedIntegrationIncident in code that requires IntegrationIncident
-// 		// and then make assertions.
+//		// use mockedIntegrationIncident in code that requires IntegrationIncident
+//		// and then make assertions.
 //
-// 	}
+//	}
 type IntegrationIncidentMock struct {
 	// DeviceStateUpdatedFunc mocks the DeviceStateUpdated method.
 	DeviceStateUpdatedFunc func(ctx context.Context, deviceId string, statusMessage models.StatusMessage) error
 
 	// LifebuoyValueUpdatedFunc mocks the LifebuoyValueUpdated method.
 	LifebuoyValueUpdatedFunc func(ctx context.Context, deviceId string, deviceValue string) error
+
+	// SewageOverflowObservedFunc mocks the SewageOverflowObserved method.
+	SewageOverflowObservedFunc func(ctx context.Context, functionUpdated models.FunctionUpdated) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -58,9 +64,17 @@ type IntegrationIncidentMock struct {
 			// DeviceValue is the deviceValue argument value.
 			DeviceValue string
 		}
+		// SewageOverflowObserved holds details about calls to the SewageOverflowObserved method.
+		SewageOverflowObserved []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// FunctionUpdated is the functionUpdated argument value.
+			FunctionUpdated models.FunctionUpdated
+		}
 	}
-	lockDeviceStateUpdated   sync.RWMutex
-	lockLifebuoyValueUpdated sync.RWMutex
+	lockDeviceStateUpdated     sync.RWMutex
+	lockLifebuoyValueUpdated   sync.RWMutex
+	lockSewageOverflowObserved sync.RWMutex
 }
 
 // DeviceStateUpdated calls DeviceStateUpdatedFunc.
@@ -85,7 +99,8 @@ func (mock *IntegrationIncidentMock) DeviceStateUpdated(ctx context.Context, dev
 
 // DeviceStateUpdatedCalls gets all the calls that were made to DeviceStateUpdated.
 // Check the length with:
-//     len(mockedIntegrationIncident.DeviceStateUpdatedCalls())
+//
+//	len(mockedIntegrationIncident.DeviceStateUpdatedCalls())
 func (mock *IntegrationIncidentMock) DeviceStateUpdatedCalls() []struct {
 	Ctx           context.Context
 	DeviceId      string
@@ -124,7 +139,8 @@ func (mock *IntegrationIncidentMock) LifebuoyValueUpdated(ctx context.Context, d
 
 // LifebuoyValueUpdatedCalls gets all the calls that were made to LifebuoyValueUpdated.
 // Check the length with:
-//     len(mockedIntegrationIncident.LifebuoyValueUpdatedCalls())
+//
+//	len(mockedIntegrationIncident.LifebuoyValueUpdatedCalls())
 func (mock *IntegrationIncidentMock) LifebuoyValueUpdatedCalls() []struct {
 	Ctx         context.Context
 	DeviceId    string
@@ -138,5 +154,41 @@ func (mock *IntegrationIncidentMock) LifebuoyValueUpdatedCalls() []struct {
 	mock.lockLifebuoyValueUpdated.RLock()
 	calls = mock.calls.LifebuoyValueUpdated
 	mock.lockLifebuoyValueUpdated.RUnlock()
+	return calls
+}
+
+// SewageOverflowObserved calls SewageOverflowObservedFunc.
+func (mock *IntegrationIncidentMock) SewageOverflowObserved(ctx context.Context, functionUpdated models.FunctionUpdated) error {
+	if mock.SewageOverflowObservedFunc == nil {
+		panic("IntegrationIncidentMock.SewageOverflowObservedFunc: method is nil but IntegrationIncident.SewageOverflowObserved was just called")
+	}
+	callInfo := struct {
+		Ctx             context.Context
+		FunctionUpdated models.FunctionUpdated
+	}{
+		Ctx:             ctx,
+		FunctionUpdated: functionUpdated,
+	}
+	mock.lockSewageOverflowObserved.Lock()
+	mock.calls.SewageOverflowObserved = append(mock.calls.SewageOverflowObserved, callInfo)
+	mock.lockSewageOverflowObserved.Unlock()
+	return mock.SewageOverflowObservedFunc(ctx, functionUpdated)
+}
+
+// SewageOverflowObservedCalls gets all the calls that were made to SewageOverflowObserved.
+// Check the length with:
+//
+//	len(mockedIntegrationIncident.SewageOverflowObservedCalls())
+func (mock *IntegrationIncidentMock) SewageOverflowObservedCalls() []struct {
+	Ctx             context.Context
+	FunctionUpdated models.FunctionUpdated
+} {
+	var calls []struct {
+		Ctx             context.Context
+		FunctionUpdated models.FunctionUpdated
+	}
+	mock.lockSewageOverflowObserved.RLock()
+	calls = mock.calls.SewageOverflowObserved
+	mock.lockSewageOverflowObserved.RUnlock()
 	return calls
 }

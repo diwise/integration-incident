@@ -32,7 +32,8 @@ func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenRes
 
 	log := logging.GetFromContext(ctx)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl+"/token", body)
+	var req *http.Request
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl+"/token", body)
 	if err != nil {
 		err = fmt.Errorf("failed to create post request: %w", err)
 		log.Err(err).Msg("request error")
@@ -42,7 +43,8 @@ func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenRes
 	req.Header.Set("Authorization", authCode)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := httpClient.Do(req)
+	var resp *http.Response
+	resp, err = httpClient.Do(req)
 	if err != nil {
 		log.Err(err).Msg("request failed")
 		return nil, err
@@ -55,7 +57,8 @@ func getAccessToken(ctx context.Context, gatewayUrl, authCode string) (*tokenRes
 		return nil, err
 	}
 
-	bodyBytes, err := io.ReadAll(resp.Body)
+	var bodyBytes []byte
+	bodyBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
 		err = fmt.Errorf("failed to read response body (%w)", err)
 		log.Err(err).Msg("i/o error")
