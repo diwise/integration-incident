@@ -13,8 +13,8 @@ type FunctionUpdated struct {
 	SubType  string    `json:"subType"`
 	Location *location `json:"location,omitempty"`
 	Name     string    `json:"name"`
-	
-	Counter  *struct {
+
+	Counter *struct {
 		Counter int  `json:"counter"`
 		State   bool `json:"state"`
 	} `json:"counter,omitempty"`
