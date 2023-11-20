@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
@@ -68,6 +69,13 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl, bytes.NewBuffer(incidentBytes))
 	req.Header.Add("Authorization", "Bearer "+token)
 	req.Header.Add("Content-Type", "application/json")
+
+	dump, err := httputil.DumpRequestOut(req, true)
+	if err != nil {
+	  log.Error().Err(err).Msg("Could not dump the request")
+	} else {
+	  log.Debug().Msgf("HTTP request: %s", dump)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
