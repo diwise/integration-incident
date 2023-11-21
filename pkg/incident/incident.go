@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httputil"
+	"slices"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
@@ -72,9 +73,9 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 
 	dump, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
-	  log.Error().Err(err).Msg("Could not dump the request")
+		log.Error().Err(err).Msg("Could not dump the request")
 	} else {
-	  log.Debug().Msgf("HTTP request: %s", dump)
+		log.Debug().Msgf("HTTP request: %s", dump)
 	}
 
 	resp, err := httpClient.Do(req)
@@ -108,7 +109,7 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	if response.Status != "OK" {
+	if !slices.Contains([]string{"SPARAT", "INSKICKAT", "KLART"}, response.Status) {
 		err = fmt.Errorf("incident backend returned status \"%s\" with message \"%s\"", response.Status, response.Message)
 		return err
 	}
