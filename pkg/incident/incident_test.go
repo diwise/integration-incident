@@ -39,7 +39,7 @@ func setupMockService(responseCode int, responseBody string) *httptest.Server {
 			w.Header().Add("Content-Type", "application/ld+json")
 			w.WriteHeader(responseCode)
 			w.Write([]byte(`{
-				"status": "OK",
+				"status": "INSKICKAT",
 				"incidentId": "SP_20210819_415b"
 			  }`))
 		}
