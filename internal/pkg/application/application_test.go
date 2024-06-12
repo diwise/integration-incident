@@ -10,10 +10,10 @@ import (
 	"github.com/matryer/is"
 )
 
-func status(deviceID string, code int, messages ...string) models.StatusMessage {
+func status(deviceID string, code int, timestamp time.Time, messages ...string) models.StatusMessage {
 	return models.StatusMessage{
 		DeviceID:     deviceID,
-		Timestamp:    time.Now().Format(time.RFC3339),
+		Timestamp:    timestamp.Format(time.RFC3339),
 		BatteryLevel: 100,
 		Messages:     messages,
 		Code:         code,
@@ -23,20 +23,35 @@ func status(deviceID string, code int, messages ...string) models.StatusMessage 
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfStatusIsNoErrOrPayloadErr(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, "No error"))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, time.Now().UTC(), "No error"))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 
-	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 100, "Payload error"))
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 100, time.Now().UTC(), "Payload error"))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
+}
 
+func TestThatDeviceStateUpdatedDoesNotSendIncidentIfStatusIsFreezeAndOutOfBounds(t *testing.T) {
+	is, incRep, app := testSetup(t)
+
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 1, time.Date(2024, 5, 31, 12, 12, 12, 0, time.UTC), "Freeze"))
+	is.NoErr(err)
+	incRep.assertNotCalled(is)
+}
+
+func TestThatDeviceStateUpdatedSendIncidentIfStatusIsFreezeAndWithinBounds(t *testing.T) {
+	is, incRep, app := testSetup(t)
+
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 1, time.Date(2024, 2, 28, 12, 12, 12, 0, time.UTC), "Freeze"))
+	is.NoErr(err)
+	incRep.assertCalledOnce(is)
 }
 
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, "No error"))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId1", 0, time.Now().UTC(), "No error"))
 	is.NoErr(err)
 	incRep.assertNotCalled(is)
 }
@@ -44,51 +59,47 @@ func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceDoesNotExist(t *testin
 func TestThatDeviceStateUpdatedDoesNotSendIncidentIfDeviceStateIsTheSame(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1, time.Now().UTC()))
 	is.NoErr(err)
-	incRep.assertCallCount(is, 1)
+	incRep.assertCallCount(is, 0)
 
-	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1, time.Now().UTC()))
 	is.NoErr(err)
-	incRep.assertCallCount(is, 1)
+	incRep.assertCallCount(is, 0)
 }
 
 func TestThatDeviceStateUpdatedDoesNotSendIncidentWhenUpdatedStateIsNoError(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 1, time.Now().UTC()))
 	is.NoErr(err)
-	incRep.assertCallCount(is, 1)
+	incRep.assertCallCount(is, 0)
 
-	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 0, "No error"))
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId2", 0, time.Now().UTC(), "No error"))
 	is.NoErr(err)
-	incRep.assertCallCount(is, 1)
+	incRep.assertCallCount(is, 0)
 }
 
-func TestThatDeviceStateUpdatedSendsIncidentReportOnStateChanged(t *testing.T) {
+func TestThatDeviceStateUpdatedDoesNotSendIncidentReportOnStateChangedButWrongErrorType(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 0))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 0, time.Now().UTC()))
 	is.NoErr(err)
 
-	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 4, "Power low"))
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId3", 4, time.Now().UTC(), "Power low"))
 	is.NoErr(err)
-	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId3 - Låg batterinivå")
-	is.Equal(incRep.incidents[0].Category, 17)
+	incRep.assertCallCount(is, 0)
 }
 
-func TestThatDeviceUpdatedSendsIncidentReportEvenOnUnknownState(t *testing.T) {
+func TestThatDeviceUpdatedDoesNotSendIncidentReportOnUnknownState(t *testing.T) {
 	is, incRep, app := testSetup(t)
 
-	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 0))
+	err := app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 0, time.Now().UTC()))
 	is.NoErr(err)
 
-	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 3, "Unknown"))
+	err = app.DeviceStateUpdated(context.Background(), "urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", status("urn:ngsi-ld:Device:se:servanet:lora:msva:devId4", 3, time.Now().UTC(), "Unknown"))
 	is.NoErr(err)
-	incRep.assertCalledOnce(is)
-	is.Equal(incRep.incidents[0].Description, "devId4 - Okänt fel")
-	is.Equal(incRep.incidents[0].Category, 17)
+	incRep.assertCallCount(is, 0)
 }
 
 func TestThatDeviceValueUpdatedDoesNotSendIncidentIfDeviceValueIsTheSame(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/diwise/integration-incident/internal/pkg/application/services"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
@@ -14,6 +15,7 @@ import (
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 )
 
@@ -111,7 +113,19 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 	if deviceState != StateNoError {
 		const watermeterCategory int = 17
-		incident := models.NewIncident(watermeterCategory, translateJoin(shortId, sm)).AtLocation(62.388178, 17.315090)
+		errorType := Join(sm.Messages, " ", translate)
+
+		if !strings.Contains(errorType, "Spricka") && !strings.Contains(errorType, "Läckage") && !strings.Contains(errorType, "Is") {
+			log.Info().Msgf("device state contains error of type '%s', which is not prioritised", errorType)
+			return nil
+		}
+
+		if errorType == "Is eller Frys Varning" && !withinBounds(sm.Timestamp) {
+			log.Info().Msg("a freeze warning was received, but timestamp is out of bounds")
+			return nil
+		}
+
+		incident := models.NewIncident(watermeterCategory, translateJoin(deviceId, sm)).AtLocation(62.388178, 17.315090)
 
 		err := a.incidentReporter(ctx, *incident)
 		if err != nil {
@@ -122,6 +136,20 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 	a.cache.Add(key, deviceState)
 	return nil
+}
+
+func withinBounds(timestamp string) bool {
+	parsed, err := time.Parse(time.RFC3339, timestamp)
+	if err != nil {
+		log.Error().Err(err).Msg("could not parse timestamp")
+		return false
+	}
+
+	if parsed.Month() > 4 && parsed.Month() < 10 {
+		return false
+	}
+
+	return true
 }
 
 func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error {
