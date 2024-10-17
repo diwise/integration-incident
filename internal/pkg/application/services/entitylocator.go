@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/diwise/context-broker/pkg/ngsild/types/entities"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
@@ -35,6 +36,11 @@ var tracer = otel.Tracer("integration-incident/svcs/locator")
 
 const DefaultBrokerTenant string = "default"
 
+var httpClient = http.Client{
+	Transport: otelhttp.NewTransport(http.DefaultTransport),
+	Timeout:   10 * time.Second,
+}
+
 func (l *locator) Locate(ctx context.Context, entityType, entityID string) (latitude, longitude float64, err error) {
 
 	ctx, span := tracer.Start(ctx, "locate")
@@ -58,11 +64,7 @@ func (l *locator) Locate(ctx context.Context, entityType, entityID string) (lati
 		req.Header.Add("NGSILD-Tenant", l.tenant)
 	}
 
-	log.Info().Msgf("requesting entity details for %s %s from %s", entityType, entityID, l.host)
-
-	httpClient := http.Client{
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
-	}
+	log.Info(fmt.Sprintf("requesting entity details for %s %s from %s", entityType, entityID, l.host))
 
 	response, err := httpClient.Do(req)
 	if err != nil {

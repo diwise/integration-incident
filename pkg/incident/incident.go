@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"slices"
+	"time"
 
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
@@ -21,6 +22,11 @@ var errNotAuthorized = errors.New("invalid auth code or token refresh required")
 
 type ReporterFunc func(context.Context, models.Incident) error
 
+var httpClient = http.Client{
+	Transport: otelhttp.NewTransport(http.DefaultTransport),
+	Timeout:   10 * time.Second,
+}
+
 func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (ReporterFunc, error) {
 	token, err := getAccessToken(ctx, gatewayUrl, authCode)
 	if err != nil {
@@ -31,7 +37,7 @@ func NewIncidentReporter(ctx context.Context, gatewayUrl, authCode string) (Repo
 		err := postIncident(ctx, incident, gatewayUrl, token.AccessToken)
 		if err == errNotAuthorized {
 			log := logging.GetFromContext(ctx)
-			log.Error().Err(err).Msg("post incident failed, retrying after access token refresh")
+			log.Error("post incident failed, retrying after access token refresh", "err", err.Error())
 
 			newToken, err := getAccessToken(ctx, gatewayUrl, authCode)
 			if err != nil {
@@ -58,14 +64,11 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	gatewayUrl = gatewayUrl + "/incident/2.0/incident"
+	// TODO: Make the municipality code (2281) configurable
+	gatewayUrl = gatewayUrl + "/incident/3.0/2281/incident"
 
 	log := logging.GetFromContext(ctx)
-	log.Info().Msgf("posting incident \"%s\" (cat: %d) to: %s", incident.Description, incident.Category, gatewayUrl)
-
-	httpClient := http.Client{
-		Transport: otelhttp.NewTransport(http.DefaultTransport),
-	}
+	log.Info(fmt.Sprintf("posting incident \"%s\" (cat: %d) to: %s", incident.Description, incident.Category, gatewayUrl))
 
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, gatewayUrl, bytes.NewBuffer(incidentBytes))
 	req.Header.Add("Authorization", "Bearer "+token)
@@ -73,9 +76,9 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 
 	dump, err := httputil.DumpRequestOut(req, true)
 	if err != nil {
-		log.Error().Err(err).Msg("Could not dump the request")
+		log.Error("could not dump the request", "err", err.Error())
 	} else {
-		log.Debug().Msgf("HTTP request: %s", dump)
+		log.Debug(fmt.Sprintf("HTTP request: %s", dump))
 	}
 
 	resp, err := httpClient.Do(req)
@@ -114,7 +117,7 @@ func postIncident(ctx context.Context, incident models.Incident, gatewayUrl, tok
 		return err
 	}
 
-	log.Info().Msgf("incident created with ID: %s", response.IncidentID)
+	log.Info("incident created", "incident_id", response.IncidentID)
 
 	return nil
 }

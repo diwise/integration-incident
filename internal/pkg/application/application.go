@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -11,11 +12,9 @@ import (
 	"github.com/diwise/integration-incident/internal/pkg/application/services"
 	"github.com/diwise/integration-incident/internal/pkg/infrastructure/repositories/models"
 	"github.com/diwise/integration-incident/pkg/incident"
-	"github.com/diwise/ngsi-ld-golang/pkg/datamodels/diwise"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/logging"
 	"github.com/diwise/service-chassis/pkg/infrastructure/o11y/tracing"
-	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 )
 
@@ -98,7 +97,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 	deviceState := strconv.Itoa(sm.Code)
 	if deviceState == PayloadError {
-		log.Warn().Msg("ignoring payload error")
+		log.Warn("ignoring payload error")
 		return nil
 	}
 
@@ -109,19 +108,19 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return nil
 	}
 
-	log.Info().Msgf("device state changed to %s", deviceState)
+	log.Info("device state changed", "state", deviceState)
 
 	if deviceState != StateNoError {
 		const watermeterCategory int = 17
 		errorType := Join(sm.Messages, " ", translate)
 
 		if !strings.Contains(errorType, "Spricka") && !strings.Contains(errorType, "Läckage") && !strings.Contains(errorType, "Is") {
-			log.Info().Msgf("device state contains error of type '%s', which is not prioritised", errorType)
+			log.Info(fmt.Sprintf("device state contains error of type '%s', which is not prioritised", errorType))
 			return nil
 		}
 
-		if errorType == "Is eller Frys Varning" && !withinBounds(sm.Timestamp) {
-			log.Info().Msg("a freeze warning was received, but timestamp is out of bounds")
+		if errorType == "Is eller Frys Varning" && !withinBounds(ctx, sm.Timestamp) {
+			log.Info("a freeze warning was received, but timestamp is out of bounds")
 			return nil
 		}
 
@@ -129,7 +128,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 		err := a.incidentReporter(ctx, *incident)
 		if err != nil {
-			log.Error().Err(err).Msg("could not post incident")
+			err = fmt.Errorf("could not post incident: %s", err.Error())
 			return err
 		}
 	}
@@ -138,10 +137,10 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 	return nil
 }
 
-func withinBounds(timestamp string) bool {
+func withinBounds(ctx context.Context, timestamp string) bool {
 	parsed, err := time.Parse(time.RFC3339, timestamp)
 	if err != nil {
-		log.Error().Err(err).Msg("could not parse timestamp")
+		logging.GetFromContext(ctx).Error("could not parse timestamp", "err", err.Error())
 		return false
 	}
 
@@ -154,19 +153,22 @@ func withinBounds(timestamp string) bool {
 
 func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue string) error {
 	var err error
+	var log *slog.Logger
 
 	ctx, span := tracer.Start(ctx, "lifebuoy-updated")
 	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
 
-	log := logging.GetFromContext(ctx)
-	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
+	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, logging.GetFromContext(ctx), ctx)
 
-	if !strings.HasPrefix(deviceId, diwise.LifebuoyIDPrefix) {
+	const LifebuoyTypeName string = "Lifebuoy"
+	const LifebuoyIDPrefix string = "urn:ngsi-ld:" + LifebuoyTypeName + ":"
+
+	if !strings.HasPrefix(deviceId, LifebuoyIDPrefix) {
 		err = fmt.Errorf("device with id %s is not supported", deviceId)
 		return err
 	}
 
-	shortId := strings.TrimPrefix(deviceId, diwise.LifebuoyIDPrefix)
+	shortId := strings.TrimPrefix(deviceId, LifebuoyIDPrefix)
 
 	key := fmt.Sprintf("%s:%s", shortId, "value")
 	exists, changed := a.cache.ExistsAndIsChanged(key, deviceValue)
@@ -176,19 +178,19 @@ func (a *app) LifebuoyValueUpdated(ctx context.Context, deviceId, deviceValue st
 	}
 
 	if deviceValue == "off" {
-		log.Info().Msgf("state changed to \"off\" on device: %s", shortId)
+		log.Info("state changed to \"off\" on device", "device_id", shortId)
 
 		const lifebuoyCategory int = 15
 		incident := models.NewIncident(lifebuoyCategory, "Livboj kan ha flyttats eller utsatts för åverkan.")
 
-		latitude, longitude, err := a.entityLocator.Locate(ctx, diwise.LifebuoyTypeName, deviceId)
+		latitude, longitude, err := a.entityLocator.Locate(ctx, LifebuoyTypeName, deviceId)
 		if err == nil {
 			incident = incident.AtLocation(latitude, longitude)
 		}
 
 		err = a.incidentReporter(ctx, *incident)
 		if err != nil {
-			log.Err(err).Msg("could not post incident")
+			err = fmt.Errorf("could not post incident: %s", err.Error())
 			return err
 		}
 	}
@@ -216,7 +218,7 @@ func (a *app) SewageOverflowObserved(ctx context.Context, functionUpdated models
 	if functionUpdated.Stopwatch.State {
 		const SewageOverflowObservedCategory int = 18
 
-		log.Info().Msgf("SewageOverflowObserved, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name)
+		log.Info(fmt.Sprintf("SewageOverflowObserved, id: %s, name: %s", functionUpdated.Id, functionUpdated.Name))
 
 		incident := models.NewIncident(SewageOverflowObservedCategory, fmt.Sprintf("Bräddning upptäckt vid %s", functionUpdated.Name))
 
@@ -226,7 +228,7 @@ func (a *app) SewageOverflowObserved(ctx context.Context, functionUpdated models
 
 		err = a.incidentReporter(ctx, *incident)
 		if err != nil {
-			log.Err(err).Msg("could not post incident")
+			err = fmt.Errorf("could not post incident: %s", err.Error())
 			return err
 		}
 	}

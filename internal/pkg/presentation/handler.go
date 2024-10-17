@@ -20,16 +20,13 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/riandyrn/otelchi"
 	"github.com/rs/cors"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 )
 
 var tracer = otel.Tracer("integration-incident/handlers")
 
-func CreateRouterAndStartServing(ctx context.Context, app application.IntegrationIncident, servicePort string) error {
+func CreateRouter(ctx context.Context, app application.IntegrationIncident) (*chi.Mux, error) {
 	r := chi.NewRouter()
-
-	log := logging.GetFromContext(ctx)
 
 	r.Use(cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},
@@ -42,28 +39,21 @@ func CreateRouterAndStartServing(ctx context.Context, app application.Integratio
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	r.Post("/api/notify", notificationHandler(log, app))
+	r.Post("/api/notify", notificationHandler(ctx, app))
 
 	p, err := cloudevents.NewHTTP()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to create protocol: %s", err.Error())
+		return nil, fmt.Errorf("failed to create protocol: %s", err.Error())
 	}
 
-	h, err := cloudevents.NewHTTPReceiveHandler(context.Background(), p, receive(log, app))
+	h, err := cloudevents.NewHTTPReceiveHandler(context.Background(), p, receive(ctx, app))
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to create handler: %s", err.Error())
+		return nil, fmt.Errorf("failed to create handler: %s", err.Error())
 	}
 
 	r.Post("/api/cloudevents", cloudeventReceiveHandler(h))
 
-	log.Info().Str("port", servicePort).Msg("starting to listen for connections")
-
-	err = http.ListenAndServe(":"+servicePort, r)
-	if err != nil {
-		log.Fatal().Err(err).Msg("failed to listen for connections")
-	}
-
-	return nil
+	return r, nil
 }
 
 func cloudeventReceiveHandler(h *client.EventReceiver) http.HandlerFunc {
@@ -72,7 +62,9 @@ func cloudeventReceiveHandler(h *client.EventReceiver) http.HandlerFunc {
 	})
 }
 
-func receive(logger zerolog.Logger, app application.IntegrationIncident) func(context.Context, cloudevents.Event) {
+func receive(ctx context.Context, app application.IntegrationIncident) func(context.Context, cloudevents.Event) {
+	logger := logging.GetFromContext(ctx)
+
 	return func(ctx context.Context, event cloudevents.Event) {
 		var err error
 
@@ -81,7 +73,7 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 
 		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
-		log.Debug().Str("event_type", event.Type()).Msg("received cloud event")
+		log.Debug("received cloud event", "event_type", event.Type())
 
 		eventType := strings.ToLower(event.Type())
 
@@ -91,15 +83,15 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 
 			err = json.Unmarshal(event.Data(), &statusMessage)
 			if err != nil {
-				log.Err(err).Msg("failed to unmarshal event")
+				log.Error("failed to unmarshal event", "err", err.Error())
 				return
 			}
 
 			if strings.Contains(statusMessage.DeviceID, "se:servanet:lora:msva:") {
-				ctx = logging.NewContextWithLogger(ctx, log.With().Str("device_id", statusMessage.DeviceID).Logger())
+				ctx = logging.NewContextWithLogger(ctx, log, "device_id", statusMessage.DeviceID)
 				err = app.DeviceStateUpdated(ctx, statusMessage.DeviceID, statusMessage)
 				if err != nil {
-					log.Err(err).Msg("device status updated failed")
+					logging.GetFromContext(ctx).Error("device status updated failed", "err", err.Error())
 					return
 				}
 			}
@@ -108,26 +100,28 @@ func receive(logger zerolog.Logger, app application.IntegrationIncident) func(co
 
 			err = json.Unmarshal(event.Data(), &functionUpdated)
 			if err != nil {
-				log.Err(err).Msg("failed to unmarshal event")
+				log.Error("failed to unmarshal event", "err", err.Error())
 				return
 			}
 
-			log.Debug().Msgf("function.updated - %s %s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType)
+			log.Debug(fmt.Sprintf("function.updated - %s %s:%s", functionUpdated.Id, functionUpdated.Type, functionUpdated.SubType))
 
 			if functionUpdated.Type == "stopwatch" && functionUpdated.SubType == "overflow" {
 				err = app.SewageOverflowObserved(ctx, functionUpdated)
 			}
 			if err != nil {
-				log.Err(err).Msg("sewer overflow failed")
+				log.Error("sewer overflow failed", "err", err.Error())
 				return
 			}
 		default:
-			log.Info().Str("event_type", event.Type()).Msg("ignoring unknown type")
+			log.Info("ignoring unknown type", "event_type", event.Type())
 		}
 	}
 }
 
-func notificationHandler(logger zerolog.Logger, app application.IntegrationIncident) http.HandlerFunc {
+func notificationHandler(ctx context.Context, app application.IntegrationIncident) http.HandlerFunc {
+	logger := logging.GetFromContext(ctx)
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
 
@@ -141,7 +135,7 @@ func notificationHandler(logger zerolog.Logger, app application.IntegrationIncid
 		bodyBytes, err := io.ReadAll(r.Body)
 		if err != nil {
 			err = fmt.Errorf("failed to read request body (%w)", err)
-			log.Err(err).Msg("i/o error")
+			log.Error("i/o error", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
@@ -149,14 +143,14 @@ func notificationHandler(logger zerolog.Logger, app application.IntegrationIncid
 		err = json.Unmarshal(bodyBytes, &notif)
 		if err != nil {
 			err = fmt.Errorf("failed to unmarshal request body (%w)", err)
-			log.Err(err).Msg("bad request")
+			log.Error("bad request", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
 		if notif.SubscriptionId == "" {
 			err = fmt.Errorf("request body is not a valid notification")
-			log.Err(err).Msg("bad request")
+			log.Error("bad request", "err", err.Error())
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
