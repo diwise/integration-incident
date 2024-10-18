@@ -29,7 +29,7 @@ func TestPostLifebuouyIncident(t *testing.T) {
 	}
 }
 
-func setupMockService(responseCode int, responseBody string) *httptest.Server {
+func setupMockService(responseCode int, _ string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "token") {
 			w.Header().Add("Content-Type", "application/json")
