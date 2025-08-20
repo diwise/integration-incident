@@ -30,7 +30,7 @@ type StatusMessage struct {
 
 func NewStatusMessage(deviceID string, code int) StatusMessage {
 	c := strconv.Itoa(code)
-	
+
 	return StatusMessage{
 		DeviceID: deviceID,
 		Code:     &c,
