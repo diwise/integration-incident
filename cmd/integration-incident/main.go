@@ -22,7 +22,7 @@ const serviceName string = "integration-incident"
 func main() {
 
 	serviceVersion := buildinfo.SourceVersion()
-	ctx, logger, cleanup := o11y.Init(context.Background(), serviceName, serviceVersion)
+	ctx, logger, cleanup := o11y.Init(context.Background(), serviceName, serviceVersion, "json")
 	defer cleanup()
 
 	baseUrl := os.Getenv("DIWISE_BASE_URL")

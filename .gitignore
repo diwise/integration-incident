@@ -1,2 +1,6 @@
 .vscode
 cmd/integration-incident/integration-incident
+
+.zed
+
+__debug*

@@ -95,9 +95,19 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		PayloadError string = "100"
 	)
 
-	deviceState := strconv.Itoa(sm.Code)
+	if sm.Code == nil {
+		log.Debug("statusCode did not contain any information", "device_id", deviceId)
+		return nil
+	}
+
+	deviceState := *sm.Code
+
 	if deviceState == PayloadError {
 		log.Warn("ignoring payload error")
+		return nil
+	}
+
+	if deviceState == StateNoError {
 		return nil
 	}
 
@@ -110,41 +120,33 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 	log.Info("device state changed", "state", deviceState)
 
-	if deviceState != StateNoError {
-		const watermeterCategory int = 17
-		errorType := Join(sm.Messages, " ", translate)
+	const watermeterCategory int = 17
+	errorType := Join(sm.Messages, " ", translate)
 
-		if !strings.Contains(errorType, "Spricka") && !strings.Contains(errorType, "Läckage") && !strings.Contains(errorType, "Is") {
-			log.Info(fmt.Sprintf("device state contains error of type '%s', which is not prioritised", errorType))
-			return nil
-		}
+	if !strings.Contains(errorType, "Spricka") && !strings.Contains(errorType, "Läckage") && !strings.Contains(errorType, "Is") {
+		log.Info(fmt.Sprintf("device state contains error of type '%s', which is not prioritised", errorType))
+		return nil
+	}
 
-		if errorType == "Is eller Frys Varning" && !withinBounds(ctx, sm.Timestamp) {
-			log.Info("a freeze warning was received, but timestamp is out of bounds")
-			return nil
-		}
+	if errorType == "Is eller Frys Varning" && !withinBounds(ctx, sm.Timestamp) {
+		log.Info("a freeze warning was received, but timestamp is out of bounds")
+		return nil
+	}
 
-		incident := models.NewIncident(watermeterCategory, translateJoin(deviceId, sm)).AtLocation(62.388178, 17.315090)
+	incident := models.NewIncident(watermeterCategory, translateJoin(deviceId, sm)).AtLocation(62.388178, 17.315090)
 
-		err := a.incidentReporter(ctx, *incident)
-		if err != nil {
-			err = fmt.Errorf("could not post incident: %s", err.Error())
-			return err
-		}
+	err = a.incidentReporter(ctx, *incident)
+	if err != nil {
+		err = fmt.Errorf("could not post incident: %s", err.Error())
+		return err
 	}
 
 	a.cache.Add(key, deviceState)
 	return nil
 }
 
-func withinBounds(ctx context.Context, timestamp string) bool {
-	parsed, err := time.Parse(time.RFC3339, timestamp)
-	if err != nil {
-		logging.GetFromContext(ctx).Error("could not parse timestamp", "err", err.Error())
-		return false
-	}
-
-	if parsed.Month() > 4 && parsed.Month() < 10 {
+func withinBounds(_ context.Context, timestamp time.Time) bool {
+	if timestamp.Month() > 4 && timestamp.Month() < 10 {
 		return false
 	}
 
@@ -250,7 +252,7 @@ func Join(elems []string, sep string, mod func(string) string) string {
 		return mod(elems[0])
 	}
 	n := len(sep) * (len(elems) - 1)
-	for i := 0; i < len(elems); i++ {
+	for i := range elems {
 		n += len(elems[i])
 	}
 
