@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
@@ -11,12 +12,15 @@ import (
 )
 
 func status(deviceID string, code int, timestamp time.Time, messages ...string) models.StatusMessage {
+	bat := float64(100)
+	c := strconv.Itoa(code)
+
 	return models.StatusMessage{
 		DeviceID:     deviceID,
-		Timestamp:    timestamp.Format(time.RFC3339),
-		BatteryLevel: 100,
+		Timestamp:    timestamp,
+		BatteryLevel: &bat,
 		Messages:     messages,
-		Code:         code,
+		Code:         &c,
 	}
 }
 
