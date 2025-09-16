@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -96,7 +97,8 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 	)
 
 	if sm.Code == nil {
-		log.Debug("statusCode did not contain any information", "device_id", deviceId)
+		b, _ := json.Marshal(sm)
+		log.Debug("statusCode did not contain any information", "device_id", deviceId, "body", string(b))
 		return nil
 	}
 
@@ -115,6 +117,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 	exists, changed := a.cache.ExistsAndIsChanged(key, deviceState)
 
 	if exists && !changed {
+		log.Debug("device state has not changed", "device_id", deviceId, "state", deviceState)
 		return nil
 	}
 
