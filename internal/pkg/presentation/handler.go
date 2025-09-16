@@ -73,7 +73,7 @@ func receive(ctx context.Context, app application.IntegrationIncident) func(cont
 
 		_, ctx, log := o11y.AddTraceIDToLoggerAndStoreInContext(span, logger, ctx)
 
-		log.Debug("received cloud event", "event_type", event.Type())
+		// log.Debug("received cloud event", "event_type", event.Type())
 
 		eventType := strings.ToLower(event.Type())
 

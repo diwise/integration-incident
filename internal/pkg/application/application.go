@@ -86,7 +86,6 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 
 	ctx, span := tracer.Start(ctx, "device-state-updated")
 	defer func() { tracing.RecordAnyErrorAndEndSpan(err, span) }()
-
 	_, ctx, log = o11y.AddTraceIDToLoggerAndStoreInContext(span, log, ctx)
 
 	shortId := deviceId[strings.LastIndex(deviceId, ":")+1:]
@@ -121,7 +120,7 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return nil
 	}
 
-	log.Info("device state changed", "state", deviceState)
+	// log.Info("device state changed", "state", deviceState)
 
 	const watermeterCategory int = 17
 	errorType := Join(sm.Messages, " ", translate)
@@ -144,7 +143,10 @@ func (a *app) DeviceStateUpdated(ctx context.Context, deviceId string, sm models
 		return err
 	}
 
+	log.Debug("incident reported", "device_id", deviceId, "state", deviceState, "error_type", errorType)
+
 	a.cache.Add(key, deviceState)
+	
 	return nil
 }
 
